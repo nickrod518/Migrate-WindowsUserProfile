@@ -13,11 +13,24 @@
 #>
 
 begin {
+	###################################################################################################################
     # Default configuration options
-    $Script:DefaultDomain = 'Domain'
+
+	# Default domain to use for profile creation
+    $Script:DefaultDomain = 'DOMAIN'
+
+	# Verify that the user running this script has this extension in their username to ensure admin rights
     $Script:AdminExtension = '-admin'
-    $Script:ValidIPAddress = '40.*'
-    $Script:MigrationStorePath = 'C:\TempFiles\MigrationStore'
+
+	# Use this to disallow migrations on IP's other than what's specified
+    $Script:ValidIPAddress = '192.168.1.*'
+
+	# Path to store the migration data on the new computer, directory will be created if it doesn't exist
+    $Script:MigrationStorePath = 'C:\FTG\MigrationStore'
+
+	# Default user profile items to exclude from migration, more info found here: 
+	# https://technet.microsoft.com/en-us/library/cc722303(v=ws.10).aspx
+	# If you want nothing excluded, set this to an empty string
     $Script:DefaultExclude = @"
         <exclude>
             <objectSet>
@@ -26,8 +39,19 @@ begin {
             </objectSet>
         </exclude>
 "@
-    $Script:USMTPath = '.\USMT'
-    $Script:ProfileMigrationSummary = "All data within user profile, excluding Documents and Favorites, will be migrated."
+
+	# Message to user describing default data that will be migrated
+	$Script:ProfileMigrationSummary = "All data within user profile, excluding Documents and Favorites, will be migrated."
+
+	# Get USMT binary path according to OS architecture. If you used the zip provided, unzip in the same directory as this script
+    if ((Get-WmiObject Win32_OperatingSystem).OSArchitecture -eq '64-bit') { 
+        $Script:USMTPath = '.\USMT\amd64'
+    } else { 
+        $Script:USMTPath = '.\USMT\x86'
+    }
+    
+	# End of configuration options
+	###################################################################################################################
 
     function Update-Log {
         param(
@@ -276,8 +300,9 @@ $ExtraDirectoryXML
         if (Test-Path $USMTPath) {
             $Script:ScanState = "$USMTPath\scanstate.exe"
             $Script:LoadState = "$USMTPath\loadstate.exe"
+			Update-Log "Using [$USMTPath] as path to USMT binaries."
         } else {
-            Update-Log "Unable to reach USMT share. Verify connection to $USMTPath and restart script.`n" -Color 'Red'
+            Update-Log "Unable to reach USMT binaries. Verify [$USMTPath] exists and restart script.`n" -Color 'Red'
             $TabControl.Enabled = $false
         }
     }
@@ -318,6 +343,7 @@ $ExtraDirectoryXML
                 Sort-Object -Descending -Property { $_.CreationTime } | Select-Object -First 1 ).BaseName
         } else {
             $OldComputer = 'N/A'
+			$NewComputerTabPage.Enabled = $false
             Update-Log -Message 'No saved state found on this computer.' -Color 'Yellow'
         }
 
@@ -438,11 +464,12 @@ $ExtraDirectoryXML
             }
         } else {
             $OldComputer = $OldComputerNameTextBox_NewPage.Text
-            Update-Log "User has verified the save state process on $OldComputer is already compelted. Proceeding with migration."
+            Update-Log "User has verified the save state process on $OldComputer is already completed. Proceeding with migration."
         }
-
+		$OldComputerName = $OldComputerNameTextBox_NewPage.Text
         # Get the location of the save state data
-        $Script:Destination = "$MigrationStorePath\$OldComputer"
+
+        $Script:Destination = "$MigrationStorePath\$OldComputerName"
 
         # Generate arguments for load state process
         $Logs = "/l:$Destination\load.log /progress:$Destination\load_progress.log"
@@ -578,7 +605,7 @@ $ExtraDirectoryXML
         Update-Log "               / \   ___ ___(_)___| |_ __ _ _ __ | |_   " -Color 'LightBlue'
         Update-Log "              / _ \ / __/ __| / __| __/ _`` | '_ \| __|  " -Color 'LightBlue'
         Update-Log "             / ___ \\__ \__ \ \__ \ || (_| | | | | |_   " -Color 'LightBlue'
-        Update-Log "            /_/   \_\___/___/_|___/\__\__,_|_| |_|\__| v1.0" -Color 'LightBlue'
+        Update-Log "            /_/   \_\___/___/_|___/\__\__,_|_| |_|\__| v1.2" -Color 'LightBlue'
         Update-Log
         Update-Log '                        by Nick Rodriguez' -Color 'Gold'
         Update-Log
@@ -640,16 +667,12 @@ process {
     $ClearLogButton.Add_Click({ $LogTextBox.Clear() })
     $LogTextBox.Controls.Add($ClearLogButton)
 
-    #region old computer tab
-
     # Create old computer tab
     $OldComputerTabPage = New-Object System.Windows.Forms.TabPage
     $OldComputerTabPage.DataBindings.DefaultDataSourceUpdateMode = 0
     $OldComputerTabPage.UseVisualStyleBackColor = $true
     $OldComputerTabPage.Text = 'Old Computer'
     $TabControl.Controls.Add($OldComputerTabPage)
-
-    #region computer info
 
     # Computer info group
     $OldComputerInfoGroupBox = New-Object System.Windows.Forms.GroupBox
@@ -745,10 +768,6 @@ process {
     $ConnectionCheckBox_OldPage.Size = New-Object System.Drawing.Size(100, 20)
     $OldComputerInfoGroupBox.Controls.Add($ConnectionCheckBox_OldPage)
 
-    #endregion
-
-    #region profile selection
-
     # Profile selection group box
     $ProfileSelectionGroupBox = New-Object System.Windows.Forms.GroupBox
     $ProfileSelectionGroupBox.Location = New-Object System.Drawing.Size(10, 110)
@@ -805,10 +824,6 @@ process {
     })
     $ProfileSelectionGroupBox.Controls.Add($SelectedProfileTextBox)
 
-    #endregion
-
-    #region extra directories
-
     # Extra directories selection group box
     $ExtraDirectoriesGroupBox = New-Object System.Windows.Forms.GroupBox
     $ExtraDirectoriesGroupBox.Location = New-Object System.Drawing.Size(240, 110)
@@ -849,8 +864,6 @@ process {
     $AddExtraDirectoryButton.Add_Click({ Add-ExtraDirectory })
     $ExtraDirectoriesDataGridView.Controls.Add($AddExtraDirectoryButton)
 
-    #endregion
-
     # Migrate button
     $MigrateButton_OldPage = New-Object System.Windows.Forms.Button
     $MigrateButton_OldPage.Location = New-Object System.Drawing.Size(300, 470)
@@ -860,18 +873,12 @@ process {
     $MigrateButton_OldPage.Add_Click({ Save-UserState })
     $OldComputerTabPage.Controls.Add($MigrateButton_OldPage)
 
-    #endregion old computer tab
-
-    #region new computer tab
-
     # Create new computer tab
     $NewComputerTabPage = New-Object System.Windows.Forms.TabPage
     $NewComputerTabPage.DataBindings.DefaultDataSourceUpdateMode = 0
     $NewComputerTabPage.UseVisualStyleBackColor = $true
     $NewComputerTabPage.Text = 'New Computer'
     $TabControl.Controls.Add($NewComputerTabPage)
-
-    #region computer info
 
     # Computer info group
     $NewComputerInfoGroupBox = New-Object System.Windows.Forms.GroupBox
@@ -963,10 +970,6 @@ process {
     $ConnectionCheckBox_NewPage.Size = New-Object System.Drawing.Size(100, 20)
     $NewComputerInfoGroupBox.Controls.Add($ConnectionCheckBox_NewPage)
 
-    #endregion computer info
-
-    #region cross-domain migration
-
     # Cross-domain migration group box
     $CrossDomainMigrationGroupBox = New-Object System.Windows.Forms.GroupBox
     $CrossDomainMigrationGroupBox.Location = New-Object System.Drawing.Size(10, 100)
@@ -1036,7 +1039,7 @@ process {
     $NewDomainTextBox.ReadOnly = $true
     $NewDomainTextBox.Location = New-Object System.Drawing.Size(100, 56)
     $NewDomainTextBox.Size = New-Object System.Drawing.Size(80, 20)
-    $NewDomainTextBox.Text = $Domain
+    $NewDomainTextBox.Text = $DefaultDomain
     $CrossDomainMigrationGroupBox.Controls.Add($NewDomainTextBox)
 
     # New user slash label
@@ -1061,8 +1064,6 @@ process {
     } else {
         $CrossDomainMigrationGroupBox.Visible = $false
     }
-
-    #endregion cross-domain migration
 
     # Override check box
     $OverrideCheckBox = New-Object System.Windows.Forms.CheckBox
@@ -1090,8 +1091,6 @@ process {
     $MigrateButton_NewPage.Text = 'Migrate'
     $MigrateButton_NewPage.Add_Click({ Load-UserState })
     $NewComputerTabPage.Controls.Add($MigrateButton_NewPage)
-
-    #endregion new computer tab
 
     # Test if user is using an admin account
     Test-UserAdmin
