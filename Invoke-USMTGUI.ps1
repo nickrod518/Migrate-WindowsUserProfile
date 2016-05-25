@@ -321,6 +321,10 @@ $ExtraDirectoryXML
         }
 
         Update-Log $Results -Color 'Cyan'
+
+	if ($ActionType -eq 'load') {
+	    Update-Log 'A reboot is recommended.' -Color 'Yellow'
+	}
     }
 
     function Get-USMTProgress {
@@ -1054,6 +1058,7 @@ process {
     $NewUserNameTextBox = New-Object System.Windows.Forms.TextBox
     $NewUserNameTextBox.Location = New-Object System.Drawing.Size(190, 56)
     $NewUserNameTextBox.Size = New-Object System.Drawing.Size(80, 20)
+    $NewUserNameTextBox.Text = $env:USERNAME
     $CrossDomainMigrationGroupBox.Controls.Add($NewUserNameTextBox)
     
     # Populate old user data if DomainMigration.txt file exists, otherwise disable group box
