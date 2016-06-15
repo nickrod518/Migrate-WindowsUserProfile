@@ -26,7 +26,7 @@ begin {
     $Script:ValidIPAddress = '192.168.1.*'
 
 	# Path to store the migration data on the new computer, directory will be created if it doesn't exist
-    $Script:MigrationStorePath = 'C:\FTG\MigrationStore'
+    $Script:MigrationStorePath = 'C:\TEMP\MigrationStore'
 
 	# Default user profile items to exclude from migration, more info found here: 
 	# https://technet.microsoft.com/en-us/library/cc722303(v=ws.10).aspx
@@ -52,7 +52,7 @@ begin {
     
 	# End of configuration options
 	###################################################################################################################
-
+    
     function Update-Log {
         param(
             [string] $Message,
@@ -86,15 +86,17 @@ begin {
                 $User = $SID.Translate([System.Security.Principal.NTAccount]).Value
                 # Don't show NT Authority or local accounts
                 if (($User -notlike 'NT Authority\*') -and ($User -notlike "$(Get-HostName)\*")) {
-                    $ProfilesDataGridView.Rows.Add($User) | Out-Null
+                    $ProfileComboBox.Items.Add($User) | Out-Null
                 }
-            } catch { }
+            } catch {
+                Update-Log "Error while translating $SID to a user name." -Color 'Yellow'
+            }
         }
     }
 
     function Get-UserProfilePath {
-        $SelectedUserDomain = $SelectedProfileTextBox.Text.Split('\', 2)[0]
-        $SelectedUserName = $SelectedProfileTextBox.Text.Split('\', 2)[1]
+        $SelectedUserDomain = $ProfileComboBox.Text.Split('\', 2)[0]
+        $SelectedUserName = $ProfileComboBox.Text.Split('\', 2)[1]
         $UserObject = New-Object System.Security.Principal.NTAccount($SelectedUserDomain, $SelectedUserName) 
         $SID = $UserObject.Translate([System.Security.Principal.SecurityIdentifier])
         $User = Get-ItemProperty -Path "Registry::HKey_Local_Machine\Software\Microsoft\Windows NT\CurrentVersion\ProfileList\$($SID.Value)"
@@ -105,6 +107,32 @@ begin {
         if (-not ($(Get-CurrentUserName) -like "*$AdminExtension")) {
             Update-Log "You are running this script with user account $(Get-CurrentUserName), which is not a $AdminExtension account. " -Color 'Red' -NoNewLine
             Update-Log "Some tasks may fail if not run with admin credentials.`n" -Color 'Red'
+        }
+    }
+
+    function Set-SaveDirectory {
+        param (
+            [Parameter(Mandatory = $true)]
+            [ValidateSet('Destination', 'Source')] 
+            [string] $Type
+        )
+
+        # Bring up file explorer so user can select a directory to add
+        $OpenDirectoryDialog = New-Object Windows.Forms.FolderBrowserDialog
+        $OpenDirectoryDialog.ShowDialog() | Out-Null
+        $SelectedDirectory = $OpenDirectoryDialog.SelectedPath
+        try {
+            # If user hits cancel it could cause attempt to add null path, so check that there's something there
+            if ($SelectedDirectory) {
+                Update-Log "Changed save directory to [$SelectedDirectory]."
+                if ($Type -eq 'Destination') {
+                    $SaveDestinationTextBox.Text = $SelectedDirectory
+                } else {
+                    $SaveSourceTextBox.Text = $SelectedDirectory
+                }
+            }
+        } catch {
+            Update-Log "There was a problem with the directory you chose: $($_.Exception.Message)" -Color Red
         }
     }
 
@@ -288,8 +316,18 @@ $ExtraDirectoryXML
 "@
 
         $Config = "$Destination\Config.xml"
-        New-Item $Config -ItemType File -Force | Out-Null
-        Set-Content $Config $ConfigContent
+        try {
+            New-Item $Config -ItemType File -Force -ErrorAction Stop | Out-Null
+        } catch {
+            Update-Log "Error creating config file [$Config]: $($_.Exception.Message)" -Color 'Red'
+            return
+        }
+        try {
+            Set-Content $Config $ConfigContent -ErrorAction Stop
+        } catch {
+            Update-Log "Error while setting config file content: $($_.Exception.Message)" -Color 'Red'
+            return
+        }
 
         # Return the path to the config
         $Config
@@ -322,9 +360,9 @@ $ExtraDirectoryXML
 
         Update-Log $Results -Color 'Cyan'
 
-	if ($ActionType -eq 'load') {
-	    Update-Log 'A reboot is recommended.' -Color 'Yellow'
-	}
+		if ($ActionType -eq 'load') {
+			Update-Log 'A reboot is recommended.' -Color 'Yellow'
+		}
     }
 
     function Get-USMTProgress {
@@ -342,13 +380,13 @@ $ExtraDirectoryXML
 
     function Get-SaveState {
         # Use the migration folder name to get the old computer name
-        if ((Test-Path $MigrationStorePath) -and (Get-ChildItem $MigrationStorePath)) {
-            $OldComputer = (Get-ChildItem $MigrationStorePath | Where-Object { $_.PSIsContainer } | 
+        if (Get-ChildItem $SaveSourceTextBox.Text -ErrorAction SilentlyContinue) {
+            $OldComputer = (Get-ChildItem $SaveSourceTextBox.Text | Where-Object { $_.PSIsContainer } | 
                 Sort-Object -Descending -Property { $_.CreationTime } | Select-Object -First 1 ).BaseName
+            Update-Log -Message "Old computer set to $OldComputer."
         } else {
             $OldComputer = 'N/A'
-			$NewComputerTabPage.Enabled = $false
-            Update-Log -Message 'No saved state found on this computer.' -Color 'Yellow'
+            Update-Log -Message "No saved state found at [$($SaveSourceTextBox.Text)]." -Color 'Yellow'
         }
 
         $OldComputer
@@ -357,39 +395,59 @@ $ExtraDirectoryXML
     function Save-UserState {
         Update-Log "`nBeginning migration..."
 
-        # If connection hasn't been verfied, test now
-        if (-not $ConnectionCheckBox_OldPage.Checked) {
-            Test-ComputerConnection -ComputerNameTextBox $NewComputerNameTextBox_OldPage `
-            -ComputerIPTextBox $NewComputerIPTextBox_OldPage -ConnectionCheckBox $ConnectionCheckBox_OldPage
+        # If we're saving locally, skip network stuff
+        if ($SaveRemotelyCheckBox.Checked) {
+            # If connection hasn't been verfied, test now
+            if (-not $ConnectionCheckBox_OldPage.Checked) {
+                Test-ComputerConnection -ComputerNameTextBox $NewComputerNameTextBox_OldPage `
+                -ComputerIPTextBox $NewComputerIPTextBox_OldPage -ConnectionCheckBox $ConnectionCheckBox_OldPage
+            }
+
+            # Try and use the IP if the user filled that out, otherwise use the name
+            if ($NewComputerIPTextBox_OldPage.Text -ne '') {
+                $NewComputer = $NewComputerIPTextBox_OldPage.Text
+            } else {
+                $NewComputer = $NewComputerNameTextBox_OldPage.Text
+            }
         }
 
-        # Try and use the IP if the user filled that out, otherwise use the name
-        if ($NewComputerIPTextBox_OldPage.Text -ne '') {
-            $NewComputer = $NewComputerIPTextBox_OldPage.Text
-        } else {
-            $NewComputer = $NewComputerNameTextBox_OldPage.Text
-        }
         $OldComputer = $OldComputerNameTextBox_OldPage.Text
 
         # After connection has been verified, continue with save state
-        if ($ConnectionCheckBox_OldPage.Checked) {
+        if ($ConnectionCheckBox_OldPage.Checked -or (-not $SaveRemotelyCheckBox.Checked)) {
             Update-Log 'Connection verified, proceeding with migration...'
 
             # Get the user profile to save
-            if ($SelectedProfileTextBox.Text) {
-                $User = $SelectedProfileTextBox.Text
+            if ($ProfileComboBox.Text) {
+                $User = $ProfileComboBox.Text
                 Update-Log "$User's profile has been selected for save state."
             } else {
                 Update-Log "You must select a user profile." -Color 'Red'
                 return
             }
 
-            # Create migration store destination folder on new computer
-            $DriveLetter = $MigrationStorePath.Split(':', 2)[0]
-            $MigrationStorePath = $MigrationStorePath.TrimStart('C:\')
-            New-Item "\\$NewComputer\$DriveLetter$\$MigrationStorePath" -ItemType Directory -Force | Out-Null
-            $Script:Destination = "\\$NewComputer\$DriveLetter$\$MigrationStorePath\$OldComputer"
-            New-Item $Destination -ItemType Directory -Force | Out-Null
+            if (-not $SaveRemotelyCheckBox.Checked) {
+                $Script:Destination = "$($SaveDestinationTextBox.Text)\$OldComputer"
+            } else {
+                # Set destination folder on new computer
+                try {
+                    $DriveLetter = $MigrationStorePath.Split(':', 2)[0]
+                    $MigrationStorePath = $MigrationStorePath.TrimStart('C:\')
+                    New-Item "\\$NewComputer\$DriveLetter$\$MigrationStorePath" -ItemType Directory -Force | Out-Null
+                    $Script:Destination = "\\$NewComputer\$DriveLetter$\$MigrationStorePath\$OldComputer"
+                } catch {
+                    Update-Log "Error while creating migration store [$Destination]: $($_.Exception.Message)" -Color 'Yellow'
+                    return
+                }
+            }
+
+            # Create destination folder
+            try {
+                New-Item $Destination -ItemType Directory -Force | Out-Null
+            } catch {
+                Update-Log "Error while creating migration store [$Destination]: $($_.Exception.Message)" -Color 'Yellow'
+                return
+            }
 
             # If profile is a domain other than $DefaultDomain, save this info to text file
             $Domain = $User.Split('\')[0]
@@ -471,15 +529,21 @@ $ExtraDirectoryXML
             Update-Log "User has verified the save state process on $OldComputer is already completed. Proceeding with migration."
         }
 		$OldComputerName = $OldComputerNameTextBox_NewPage.Text
+        
         # Get the location of the save state data
+        $Script:Destination = "$($SaveSourceTextBox.Text)\$OldComputerName"
 
-        $Script:Destination = "$MigrationStorePath\$OldComputerName"
+        # Check that the save state data exists
+        if (-not (Test-Path $Destination)) {
+            Update-Log "No saved state found at [$Destination]. Migration cancelled." -Color 'Red'
+            return
+        }
 
         # Generate arguments for load state process
         $Logs = "/l:$Destination\load.log /progress:$Destination\load_progress.log"
         
         # Check if user to be migrated is coming from a different domain and do a cross-domain migration if so
-        if ($CrossDomainMigrationGroupBox.Visible) {
+        if ($CrossDomainMigrationGroupBox.Enabled) {
             $OldUser = "$($OldDomainTextBox.Text)\$($OldUserNameTextBox.Text)"
             $NewUser = "$($NewDomainTextBox.Text)\$($NewUserNameTextBox.Text)"
 
@@ -609,7 +673,7 @@ $ExtraDirectoryXML
         Update-Log "               / \   ___ ___(_)___| |_ __ _ _ __ | |_   " -Color 'LightBlue'
         Update-Log "              / _ \ / __/ __| / __| __/ _`` | '_ \| __|  " -Color 'LightBlue'
         Update-Log "             / ___ \\__ \__ \ \__ \ || (_| | | | | |_   " -Color 'LightBlue'
-        Update-Log "            /_/   \_\___/___/_|___/\__\__,_|_| |_|\__| v1.2" -Color 'LightBlue'
+        Update-Log "            /_/   \_\___/___/_|___/\__\__,_|_| |_|\__| v1.5" -Color 'LightBlue'
         Update-Log
         Update-Log '                        by Nick Rodriguez' -Color 'Gold'
         Update-Log
@@ -629,13 +693,15 @@ public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
     # Load assemblies for building forms
     [System.Reflection.Assembly]::LoadWithPartialName("System.Drawing") | Out-Null
     [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") | Out-Null
+
+    $Script:Destination = ''
 }
 
 process {
     # Create form
     $Form = New-Object System.Windows.Forms.Form 
     $Form.Text = 'Migration Assistant by Nick Rodriguez'
-    $Form.Size = New-Object System.Drawing.Size(990, 600) 
+    $Form.Size = New-Object System.Drawing.Size(1000, 550) 
     $Form.SizeGripStyle = 'Hide'
     $Form.FormBorderStyle = 'FixedToolWindow'
     $Form.MaximizeBox = $false
@@ -645,13 +711,13 @@ process {
     $TabControl = New-object System.Windows.Forms.TabControl
     $TabControl.DataBindings.DefaultDataSourceUpdateMode = 0
     $TabControl.Location = New-Object System.Drawing.Size(10, 10)
-    $TabControl.Size = New-Object System.Drawing.Size(480, 550)
+    $TabControl.Size = New-Object System.Drawing.Size(480, 490)
     $Form.Controls.Add($TabControl)
 
     # Log output text box
     $LogTextBox = New-Object System.Windows.Forms.RichTextBox
     $LogTextBox.Location = New-Object System.Drawing.Size(500, 30) 
-    $LogTextBox.Size = New-Object System.Drawing.Size(475, 530)
+    $LogTextBox.Size = New-Object System.Drawing.Size(475, 472)
     $LogTextBox.ReadOnly = 'True'
     $LogTextBox.BackColor = 'Black'
     $LogTextBox.ForeColor = 'White'
@@ -774,63 +840,88 @@ process {
 
     # Profile selection group box
     $ProfileSelectionGroupBox = New-Object System.Windows.Forms.GroupBox
-    $ProfileSelectionGroupBox.Location = New-Object System.Drawing.Size(10, 110)
-    $ProfileSelectionGroupBox.Size = New-Object System.Drawing.Size(220, 400)
-    $ProfileSelectionGroupBox.Text = 'Profiles'
+    $ProfileSelectionGroupBox.Location = New-Object System.Drawing.Size(240, 225)
+    $ProfileSelectionGroupBox.Size = New-Object System.Drawing.Size(220, 60)
+    $ProfileSelectionGroupBox.Text = 'Profile to Migrate'
     $OldComputerTabPage.Controls.Add($ProfileSelectionGroupBox)
 
-    # Profiles data table
-    $ProfilesDataGridView = New-Object System.Windows.Forms.DataGridView
-    $ProfilesDataGridView.Location = New-Object System.Drawing.Size(5, 20)
-    $ProfilesDataGridView.Size = New-Object System.Drawing.Size(210, 320)
-    $ProfilesDataGridView.ReadOnly = $true
-    $ProfilesDataGridView.AllowUserToAddRows = $false
-    $ProfilesDataGridView.AllowUserToResizeRows = $false
-    $ProfilesDataGridView.AllowUserToResizeColumns = $false
-    $ProfilesDataGridView.MultiSelect = $false
-    $ProfilesDataGridView.ColumnCount = 1
-    $ProfilesDataGridView.AutoSizeColumnsMode = 'Fill'
-    $ProfilesDataGridView.ColumnHeadersVisible = $false
-    $ProfilesDataGridView.RowHeadersVisible = $false
-    # Populate profiles data grid view
+    # Selected Profile combo box
+    $ProfileComboBox = New-Object System.Windows.Forms.ComboBox
+    $ProfileComboBox.Location = New-Object System.Drawing.Size(5, 30) 
+    $ProfileComboBox.Size = New-Object System.Drawing.Size(210, 20)
+    $ProfileComboBox.DropDownStyle = 'DropDownList'
     Get-UserProfiles
-    $ProfilesDataGridView.Add_Click({
-        # Get the selected row
-        $SelectedProfile = $($ProfilesDataGridView.SelectedCells).Value
-        Update-Log "Selected profile set to $SelectedProfile."
+    $ProfileComboBox.Add_SelectionChangeCommitted({
+
+        # Get the selected profile
+        $SelectedProfile = $ProfileComboBox.Text
+        $UserProfilePath = Get-UserProfilePath
+        Update-Log "Selected profile set to $SelectedProfile [$UserProfilePath]."
 
         # If domain is not $Domain, let user know cross-domain migration will take place
         $Domain = $SelectedProfile.Split('\')[0]
         if ($Domain -ne $DefaultDomain) {
             Update-Log "Selected profile is coming from $Domain domain. This will be noted in save state data and used during load state for cross-domain profile migration."
         }
-
-        $SelectedProfileTextBox.Text = $SelectedProfile
     })
-    $ProfileSelectionGroupBox.Controls.Add($ProfilesDataGridView)
+    $ProfileSelectionGroupBox.Controls.Add($ProfileComboBox)
 
-    # Selected Profile label
-    $SelectedProfileLabel = New-Object System.Windows.Forms.Label
-    $SelectedProfileLabel.Location = New-Object System.Drawing.Size(5, 350)
-    $SelectedProfileLabel.Size = New-Object System.Drawing.Size(210, 20)
-    $SelectedProfileLabel.Text = 'Profile To Migrate'
-    $ProfileSelectionGroupBox.Controls.Add($SelectedProfileLabel)
+    # Alternative save location group box
+    $SaveDestinationGroupBox = New-Object System.Windows.Forms.GroupBox
+    $SaveDestinationGroupBox.Location = New-Object System.Drawing.Size(240, 110)
+    $SaveDestinationGroupBox.Size = New-Object System.Drawing.Size(220, 100)
+    $SaveDestinationGroupBox.Text = 'Save State Destination'
+    $OldComputerTabPage.Controls.Add($SaveDestinationGroupBox)
 
-    # Selected Profile text box
-    $SelectedProfileTextBox = New-Object System.Windows.Forms.TextBox
-    $SelectedProfileTextBox.ReadOnly = $true
-    $SelectedProfileTextBox.Location = New-Object System.Drawing.Size(5, 370) 
-    $SelectedProfileTextBox.Size = New-Object System.Drawing.Size(210, 20)
-    $SelectedProfileTextBox.Add_TextChanged({
-        $UserProfilePath = Get-UserProfilePath
-        Update-Log "Selected user profile path: $UserProfilePath."
-        Update-Log $ProfileMigrationSummary
+    # Save path
+    $SaveDestinationTextBox = New-Object System.Windows.Forms.TextBox
+    $SaveDestinationTextBox.ReadOnly = $true
+    $SaveDestinationTextBox.Text = $MigrationStorePath
+    $SaveDestinationTextBox.Location = New-Object System.Drawing.Size(5, 20) 
+    $SaveDestinationTextBox.Size = New-Object System.Drawing.Size(210, 20)
+    $SaveDestinationGroupBox.Controls.Add($SaveDestinationTextBox)
+
+    # Alternative save check box
+    $SaveRemotelyCheckBox = New-Object System.Windows.Forms.CheckBox
+    $SaveRemotelyCheckBox.Text = 'Save on new computer'
+    $SaveRemotelyCheckBox.Checked = $true
+    $SaveRemotelyCheckBox.Location = New-Object System.Drawing.Size(45, 45)
+    $SaveRemotelyCheckBox.Size = New-Object System.Drawing.Size(150, 20)
+    $SaveRemotelyCheckBox.Add_Click({
+        if ($SaveRemotelyCheckBox.Checked -eq $true) {
+            $OldComputerInfoGroupBox.Enabled = $true
+            Update-Log 'Local save destination disabled - ' -Color 'Yellow' -NoNewLine
+            Update-Log 'Save state will be stored on the new computer and network checks will be processed normally.'
+        } else {
+            $OldComputerInfoGroupBox.Enabled = $false
+            Update-Log 'Local save destination enabled - ' -Color 'Yellow' -NoNewLine
+            Update-Log 'Save state will be stored locally and network checks will be skipped.'
+        }
     })
-    $ProfileSelectionGroupBox.Controls.Add($SelectedProfileTextBox)
+    $SaveDestinationGroupBox.Controls.Add($SaveRemotelyCheckBox)
+
+    # Change save destination button
+    $ChangeSaveDestinationButton = New-Object System.Windows.Forms.Button
+    $ChangeSaveDestinationButton.Location = New-Object System.Drawing.Size(35, 70)
+    $ChangeSaveDestinationButton.Size = New-Object System.Drawing.Size(60, 20)
+    $ChangeSaveDestinationButton.Text = 'Change'
+    $ChangeSaveDestinationButton.Add_Click({ Set-SaveDirectory -Type Destination })
+    $SaveDestinationGroupBox.Controls.Add($ChangeSaveDestinationButton)
+
+    # Reset save destination button
+    $ResetSaveDestinationButton = New-Object System.Windows.Forms.Button
+    $ResetSaveDestinationButton.Location = New-Object System.Drawing.Size(120, 70)
+    $ResetSaveDestinationButton.Size = New-Object System.Drawing.Size(65, 20)
+    $ResetSaveDestinationButton.Text = 'Reset'
+    $ResetSaveDestinationButton.Add_Click({
+        Update-Log "Resetting save directory to [$MigrationStorePath]."
+        $SaveDestinationTextBox.Text = $MigrationStorePath
+    })
+    $SaveDestinationGroupBox.Controls.Add($ResetSaveDestinationButton)
 
     # Extra directories selection group box
     $ExtraDirectoriesGroupBox = New-Object System.Windows.Forms.GroupBox
-    $ExtraDirectoriesGroupBox.Location = New-Object System.Drawing.Size(240, 110)
+    $ExtraDirectoriesGroupBox.Location = New-Object System.Drawing.Size(10, 110)
     $ExtraDirectoriesGroupBox.Size = New-Object System.Drawing.Size(220, 350)
     $ExtraDirectoriesGroupBox.Text = 'Extra Directories'
     $OldComputerTabPage.Controls.Add($ExtraDirectoriesGroupBox)
@@ -870,7 +961,7 @@ process {
 
     # Migrate button
     $MigrateButton_OldPage = New-Object System.Windows.Forms.Button
-    $MigrateButton_OldPage.Location = New-Object System.Drawing.Size(300, 470)
+    $MigrateButton_OldPage.Location = New-Object System.Drawing.Size(300, 400)
     $MigrateButton_OldPage.Size = New-Object System.Drawing.Size(100, 40)
     $MigrateButton_OldPage.Font = New-Object System.Drawing.Font('Calibri', 16, [System.Drawing.FontStyle]::Bold)
     $MigrateButton_OldPage.Text = 'Migrate'
@@ -917,7 +1008,6 @@ process {
     $OldComputerNameTextBox_NewPage.ReadOnly = $true
     $OldComputerNameTextBox_NewPage.Location = New-Object System.Drawing.Size(100, 34) 
     $OldComputerNameTextBox_NewPage.Size = New-Object System.Drawing.Size(120, 20)
-    $OldComputerNameTextBox_NewPage.Text = Get-SaveState
     $NewComputerInfoGroupBox.Controls.Add($OldComputerNameTextBox_NewPage)
 
     # Old Computer IP text box
@@ -976,21 +1066,21 @@ process {
 
     # Cross-domain migration group box
     $CrossDomainMigrationGroupBox = New-Object System.Windows.Forms.GroupBox
-    $CrossDomainMigrationGroupBox.Location = New-Object System.Drawing.Size(10, 100)
-    $CrossDomainMigrationGroupBox.Size = New-Object System.Drawing.Size(290, 87)
+    $CrossDomainMigrationGroupBox.Location = New-Object System.Drawing.Size(10, 110)
+    $CrossDomainMigrationGroupBox.Size = New-Object System.Drawing.Size(220, 87)
     $CrossDomainMigrationGroupBox.Text = 'Cross-Domain Migration'
     $NewComputerTabPage.Controls.Add($CrossDomainMigrationGroupBox)
 
     # Domain label
     $DomainLabel = New-Object System.Windows.Forms.Label
-    $DomainLabel.Location = New-Object System.Drawing.Size(100, 12)
-    $DomainLabel.Size = New-Object System.Drawing.Size(80, 22)
+    $DomainLabel.Location = New-Object System.Drawing.Size(70, 12)
+    $DomainLabel.Size = New-Object System.Drawing.Size(50, 22)
     $DomainLabel.Text = 'Domain'
     $CrossDomainMigrationGroupBox.Controls.Add($DomainLabel)
 
     # User name label
     $UserNameLabel = New-Object System.Windows.Forms.Label
-    $UserNameLabel.Location = New-Object System.Drawing.Size(190, 12)
+    $UserNameLabel.Location = New-Object System.Drawing.Size(125, 12)
     $UserNameLabel.Size = New-Object System.Drawing.Size(80, 22)
     $UserNameLabel.Text = 'User Name'
     $CrossDomainMigrationGroupBox.Controls.Add($UserNameLabel)
@@ -998,21 +1088,21 @@ process {
     # Old user label
     $OldUserLabel = New-Object System.Windows.Forms.Label
     $OldUserLabel.Location = New-Object System.Drawing.Size(12, 35)
-    $OldUserLabel.Size = New-Object System.Drawing.Size(80, 22)
+    $OldUserLabel.Size = New-Object System.Drawing.Size(50, 22)
     $OldUserLabel.Text = 'Old User'
     $CrossDomainMigrationGroupBox.Controls.Add($OldUserLabel)
 
     # Old domain text box
     $OldDomainTextBox = New-Object System.Windows.Forms.TextBox
     $OldDomainTextBox.ReadOnly = $true
-    $OldDomainTextBox.Location = New-Object System.Drawing.Size(100, 34) 
-    $OldDomainTextBox.Size = New-Object System.Drawing.Size(80, 20)
+    $OldDomainTextBox.Location = New-Object System.Drawing.Size(70, 34) 
+    $OldDomainTextBox.Size = New-Object System.Drawing.Size(40, 20)
     $OldDomainTextBox.Text = $OldComputerNameTextBox_NewPage.Text
     $CrossDomainMigrationGroupBox.Controls.Add($OldDomainTextBox)
 
     # Old user slash label
     $OldUserSlashLabel = New-Object System.Windows.Forms.Label
-    $OldUserSlashLabel.Location = New-Object System.Drawing.Size(179, 33)
+    $OldUserSlashLabel.Location = New-Object System.Drawing.Size(110, 33)
     $OldUserSlashLabel.Size = New-Object System.Drawing.Size(10, 20)
     $OldUserSlashLabel.Text = '\'
     $OldUserSlashLabel.Font = New-Object System.Drawing.Font('Calibri', 12)
@@ -1021,34 +1111,28 @@ process {
     # Old user name text box
     $OldUserNameTextBox = New-Object System.Windows.Forms.TextBox
     $OldUserNameTextBox.ReadOnly = $true
-    $OldUserNameTextBox.Location = New-Object System.Drawing.Size(190, 34) 
+    $OldUserNameTextBox.Location = New-Object System.Drawing.Size(125, 34) 
     $OldUserNameTextBox.Size = New-Object System.Drawing.Size(80, 20)
-    $OldUserNameTextBox.Add_TextChanged({
-        if ($ConnectionCheckBox_NewPage.Checked) {
-            Update-Log 'Computer IP address changed, connection status unverified.' -Color 'Yellow'
-            $ConnectionCheckBox_NewPage.Checked = $false
-        }
-    })
     $CrossDomainMigrationGroupBox.Controls.Add($OldUserNameTextBox)
 
     # New user label
     $NewUserLabel = New-Object System.Windows.Forms.Label
     $NewUserLabel.Location = New-Object System.Drawing.Size(12, 57)
-    $NewUserLabel.Size = New-Object System.Drawing.Size(80, 22)
+    $NewUserLabel.Size = New-Object System.Drawing.Size(55, 22)
     $NewUserLabel.Text = 'New User'
     $CrossDomainMigrationGroupBox.Controls.Add($NewUserLabel)
 
     # New domain text box
     $NewDomainTextBox = New-Object System.Windows.Forms.TextBox
     $NewDomainTextBox.ReadOnly = $true
-    $NewDomainTextBox.Location = New-Object System.Drawing.Size(100, 56)
-    $NewDomainTextBox.Size = New-Object System.Drawing.Size(80, 20)
+    $NewDomainTextBox.Location = New-Object System.Drawing.Size(70, 56)
+    $NewDomainTextBox.Size = New-Object System.Drawing.Size(40, 20)
     $NewDomainTextBox.Text = $DefaultDomain
     $CrossDomainMigrationGroupBox.Controls.Add($NewDomainTextBox)
 
     # New user slash label
     $NewUserSlashLabel = New-Object System.Windows.Forms.Label
-    $NewUserSlashLabel.Location = New-Object System.Drawing.Size(179, 56)
+    $NewUserSlashLabel.Location = New-Object System.Drawing.Size(110, 56)
     $NewUserSlashLabel.Size = New-Object System.Drawing.Size(10, 20)
     $NewUserSlashLabel.Text = '\'
     $NewUserSlashLabel.Font = New-Object System.Drawing.Font('Calibri', 12)
@@ -1056,9 +1140,9 @@ process {
 
     # New user name text box
     $NewUserNameTextBox = New-Object System.Windows.Forms.TextBox
-    $NewUserNameTextBox.Location = New-Object System.Drawing.Size(190, 56)
+    $NewUserNameTextBox.Location = New-Object System.Drawing.Size(125, 56)
     $NewUserNameTextBox.Size = New-Object System.Drawing.Size(80, 20)
-    $NewUserNameTextBox.Text = $env:USERNAME
+	$NewUserNameTextBox.Text = $env:USERNAME
     $CrossDomainMigrationGroupBox.Controls.Add($NewUserNameTextBox)
     
     # Populate old user data if DomainMigration.txt file exists, otherwise disable group box
@@ -1067,14 +1151,15 @@ process {
         $OldDomainTextBox.Text = $OldUser.Split('\')[0]
         $OldUserNameTextBox.Text = $OldUser.Split('\')[1]
     } else {
-        $CrossDomainMigrationGroupBox.Visible = $false
+        $CrossDomainMigrationGroupBox.Enabled = $false
+        $CrossDomainMigrationGroupBox.Hide()
     }
 
     # Override check box
     $OverrideCheckBox = New-Object System.Windows.Forms.CheckBox
     $OverrideCheckBox.Text = 'Save state task completed'
-    $OverrideCheckBox.Location = New-Object System.Drawing.Size(340, 110) 
-    $OverrideCheckBox.Size = New-Object System.Drawing.Size(100, 30)
+    $OverrideCheckBox.Location = New-Object System.Drawing.Size(280, 225) 
+    $OverrideCheckBox.Size = New-Object System.Drawing.Size(300, 30)
     $OverrideCheckBox.Add_Click({
         if ($OverrideCheckBox.Checked -eq $true) {
             $NewComputerInfoGroupBox.Enabled = $false
@@ -1088,9 +1173,50 @@ process {
     })
     $NewComputerTabPage.Controls.Add($OverrideCheckBox)
 
+    # Alternative save location group box
+    $SaveSourceGroupBox = New-Object System.Windows.Forms.GroupBox
+    $SaveSourceGroupBox.Location = New-Object System.Drawing.Size(240, 110)
+    $SaveSourceGroupBox.Size = New-Object System.Drawing.Size(220, 87)
+    $SaveSourceGroupBox.Text = 'Save State Source'
+    $NewComputerTabPage.Controls.Add($SaveSourceGroupBox)
+
+    # Save path
+    $SaveSourceTextBox = New-Object System.Windows.Forms.TextBox
+    $SaveSourceTextBox.ReadOnly = $true
+    $SaveSourceTextBox.Text = $MigrationStorePath
+    $SaveSourceTextBox.Location = New-Object System.Drawing.Size(5, 20) 
+    $SaveSourceTextBox.Size = New-Object System.Drawing.Size(210, 20)
+    $SaveSourceGroupBox.Controls.Add($SaveSourceTextBox)
+
+    # Set the old computer name
+    $OldComputerNameTextBox_NewPage.Text = Get-SaveState
+
+    # Change save destination button
+    $ChangeSaveSourceButton = New-Object System.Windows.Forms.Button
+    $ChangeSaveSourceButton.Location = New-Object System.Drawing.Size(35, 50)
+    $ChangeSaveSourceButton.Size = New-Object System.Drawing.Size(60, 20)
+    $ChangeSaveSourceButton.Text = 'Change'
+    $ChangeSaveSourceButton.Add_Click({ 
+        Set-SaveDirectory -Type Source
+        $OldComputerNameTextBox_NewPage.Text = Get-SaveState
+    })
+    $SaveSourceGroupBox.Controls.Add($ChangeSaveSourceButton)
+
+    # Reset save destination button
+    $ResetSaveSourceButton = New-Object System.Windows.Forms.Button
+    $ResetSaveSourceButton.Location = New-Object System.Drawing.Size(120, 50)
+    $ResetSaveSourceButton.Size = New-Object System.Drawing.Size(65, 20)
+    $ResetSaveSourceButton.Text = 'Reset'
+    $ResetSaveSourceButton.Add_Click({
+        Update-Log "Resetting save state directory to [$MigrationStorePath]."
+        $SaveSourceTextBox.Text = $MigrationStorePath
+        $OldComputerNameTextBox_NewPage.Text = Get-SaveState
+    })
+    $SaveSourceGroupBox.Controls.Add($ResetSaveSourceButton)
+
     # Migrate button
     $MigrateButton_NewPage = New-Object System.Windows.Forms.Button
-    $MigrateButton_NewPage.Location = New-Object System.Drawing.Size(340, 145)
+    $MigrateButton_NewPage.Location = New-Object System.Drawing.Size(300, 400)
     $MigrateButton_NewPage.Size = New-Object System.Drawing.Size(100, 40)
     $MigrateButton_NewPage.Font = New-Object System.Drawing.Font('Calibri', 16, [System.Drawing.FontStyle]::Bold)
     $MigrateButton_NewPage.Text = 'Migrate'
