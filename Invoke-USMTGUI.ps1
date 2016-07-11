@@ -22,8 +22,8 @@ begin {
 	# Verify that the user running this script has this extension in their username to ensure admin rights
     $Script:AdminExtension = '-admin'
 
-	# Use this to disallow migrations on IP's other than what's specified
-    $Script:ValidIPAddress = '192.168.1.*'
+	# Use this to disallow migrations on IP's other than what's specified (e.g. set to '10.*' to only allow IP's starting with 10)
+    $Script:ValidIPAddress = '*'
 
 	# Path to store the migration data on the new computer, directory will be created if it doesn't exist
     $Script:MigrationStorePath = 'C:\TEMP\MigrationStore'
@@ -119,6 +119,13 @@ begin {
 
         # Bring up file explorer so user can select a directory to add
         $OpenDirectoryDialog = New-Object Windows.Forms.FolderBrowserDialog
+        $OpenDirectoryDialog.RootFolder = 'Desktop'
+        $OpenDirectoryDialog.SelectedPath = $SaveDestinationTextBox.Text
+        if ($Type -eq 'Destination') {
+            $OpenDirectoryDialog.SelectedPath = $SaveDestinationTextBox.Text
+        } else {
+            $OpenDirectoryDialog.SelectedPath = $SaveSourceTextBox.Text
+        }
         $OpenDirectoryDialog.ShowDialog() | Out-Null
         $SelectedDirectory = $OpenDirectoryDialog.SelectedPath
         try {
@@ -139,6 +146,8 @@ begin {
     function Add-ExtraDirectory {
         # Bring up file explorer so user can select a directory to add
         $OpenDirectoryDialog = New-Object Windows.Forms.FolderBrowserDialog
+        $OpenDirectoryDialog.RootFolder = 'Desktop'
+        $OpenDirectoryDialog.SelectedPath = 'C:\'
         $OpenDirectoryDialog.ShowDialog() | Out-Null
         $SelectedDirectory = $OpenDirectoryDialog.SelectedPath
         try {
@@ -381,8 +390,15 @@ $ExtraDirectoryXML
     function Get-SaveState {
         # Use the migration folder name to get the old computer name
         if (Get-ChildItem $SaveSourceTextBox.Text -ErrorAction SilentlyContinue) {
-            $OldComputer = (Get-ChildItem $SaveSourceTextBox.Text | Where-Object { $_.PSIsContainer } | 
-                Sort-Object -Descending -Property { $_.CreationTime } | Select-Object -First 1 ).BaseName
+            $SaveSource = Get-ChildItem $SaveSourceTextBox.Text | Where-Object { $_.PSIsContainer } | 
+                Sort-Object -Descending -Property { $_.CreationTime } | Select-Object -First 1
+            if (Test-Path "$($SaveSource.FullName)\USMT\USMT.MIG") {
+                $Script:UncompressedSource = $false
+            } else {
+                $Script:UncompressedSource = $true
+                Update-Log -Message "Uncompressed save state detected."
+            }
+            $OldComputer = $SaveSource.BaseName
             Update-Log -Message "Old computer set to $OldComputer."
         } else {
             $OldComputer = 'N/A'
@@ -460,13 +476,23 @@ $ExtraDirectoryXML
             Update-Log 'Generating configuration file...'
             $Config = Set-Config
 
-            # Generate arguments for save state process
+            # Generate parameter for logging
             $Logs = "/l:$Destination\scan.log /progress:$Destination\scan_progress.log"
+
+            # Set parameter for whether save state is compressed
+            if ($UncompressedCheckBox.Checked -eq $true) {
+                $Uncompressed = '/nocompress'
+            } else {
+                $Uncompressed = ''
+            }
+
             # Overwrite existing save state, use volume shadow copy method, exclude all but the selected user
-            $Arguments = "$Destination /i:$Config /o /vsc /ue:*\* /ui:$User $Logs"
+            $Arguments = "$Destination /i:$Config /o /vsc /ue:*\* /ui:$User $Uncompressed $Logs"
 
             # Begin saving user state to new computer
-            Update-Log "Saving state of $User to $NewComputer..." -NoNewLine
+            Update-Log "Command used:"
+            Update-Log "$ScanState $Arguments" -Color 'Cyan'
+            Update-Log "Saving state of $User to $Destination..." -NoNewLine
             Start-Process -FilePath $ScanState -ArgumentList $Arguments -Verb RunAs
 
             # Give the process time to start before checking for its existence
@@ -541,6 +567,13 @@ $ExtraDirectoryXML
 
         # Generate arguments for load state process
         $Logs = "/l:$Destination\load.log /progress:$Destination\load_progress.log"
+
+        # Set parameter for whether save state is compressed
+        if ($UncompressedSource -eq $true) {
+            $Uncompressed = '/nocompress'
+        } else {
+            $Uncompressed = ''
+        }
         
         # Check if user to be migrated is coming from a different domain and do a cross-domain migration if so
         if ($CrossDomainMigrationGroupBox.Enabled) {
@@ -554,12 +587,14 @@ $ExtraDirectoryXML
             }
 
             Update-Log "$OldUser will be migrated as $NewUser."
-            $Arguments = "$Destination /i:$Destination\Config.xml /mu:$($OldUser):$NewUser $Logs"
+            $Arguments = "$Destination /i:$Destination\Config.xml /mu:$($OldUser):$NewUser $Uncompressed $Logs"
         } else {
-            $Arguments = "$Destination /i:$Destination\Config.xml $Logs"
+            $Arguments = "$Destination /i:$Destination\Config.xml $Uncompressed $Logs"
         }
 
         # Begin loading user state to this computer
+        Update-Log "Command used:"
+        Update-Log "$LoadState $Arguments" -Color 'Cyan'
         Update-Log "Loading state of $OldComputer..." -NoNewLine
         Start-Process -FilePath $LoadState -ArgumentList $Arguments -Verb RunAs
 
@@ -673,7 +708,7 @@ $ExtraDirectoryXML
         Update-Log "               / \   ___ ___(_)___| |_ __ _ _ __ | |_   " -Color 'LightBlue'
         Update-Log "              / _ \ / __/ __| / __| __/ _`` | '_ \| __|  " -Color 'LightBlue'
         Update-Log "             / ___ \\__ \__ \ \__ \ || (_| | | | | |_   " -Color 'LightBlue'
-        Update-Log "            /_/   \_\___/___/_|___/\__\__,_|_| |_|\__| v1.5" -Color 'LightBlue'
+        Update-Log "            /_/   \_\___/___/_|___/\__\__,_|_| |_|\__| v1.6" -Color 'LightBlue'
         Update-Log
         Update-Log '                        by Nick Rodriguez' -Color 'Gold'
         Update-Log
@@ -852,7 +887,6 @@ process {
     $ProfileComboBox.DropDownStyle = 'DropDownList'
     Get-UserProfiles
     $ProfileComboBox.Add_SelectionChangeCommitted({
-
         # Get the selected profile
         $SelectedProfile = $ProfileComboBox.Text
         $UserProfilePath = Get-UserProfilePath
@@ -875,7 +909,6 @@ process {
 
     # Save path
     $SaveDestinationTextBox = New-Object System.Windows.Forms.TextBox
-    $SaveDestinationTextBox.ReadOnly = $true
     $SaveDestinationTextBox.Text = $MigrationStorePath
     $SaveDestinationTextBox.Location = New-Object System.Drawing.Size(5, 20) 
     $SaveDestinationTextBox.Size = New-Object System.Drawing.Size(210, 20)
@@ -958,6 +991,22 @@ process {
     $AddExtraDirectoryButton.Font = 'Consolas, 14'
     $AddExtraDirectoryButton.Add_Click({ Add-ExtraDirectory })
     $ExtraDirectoriesDataGridView.Controls.Add($AddExtraDirectoryButton)
+
+    # Uncompressed storage check box
+    $UncompressedCheckBox = New-Object System.Windows.Forms.CheckBox
+    $UncompressedCheckBox.Text = 'Uncompressed storage'
+    $UncompressedCheckBox.Location = New-Object System.Drawing.Size(280, 300) 
+    $UncompressedCheckBox.Size = New-Object System.Drawing.Size(300, 30)
+    $UncompressedCheckBox.Add_Click({
+        if ($UncompressedCheckBox.Checked -eq $true) {
+            Update-Log 'Uncompressed save state enabled - ' -Color 'Yellow' -NoNewLine
+            Update-Log 'Save state will be stored as uncompressed flat files.'
+        } else {
+            Update-Log 'Uncompressed save state disabled - ' -Color 'Yellow' -NoNewLine
+            Update-Log 'Save state will be stored as a compressed file.'
+        }
+    })
+    $OldComputerTabPage.Controls.Add($UncompressedCheckBox)
 
     # Migrate button
     $MigrateButton_OldPage = New-Object System.Windows.Forms.Button
@@ -1182,7 +1231,6 @@ process {
 
     # Save path
     $SaveSourceTextBox = New-Object System.Windows.Forms.TextBox
-    $SaveSourceTextBox.ReadOnly = $true
     $SaveSourceTextBox.Text = $MigrationStorePath
     $SaveSourceTextBox.Location = New-Object System.Drawing.Size(5, 20) 
     $SaveSourceTextBox.Size = New-Object System.Drawing.Size(210, 20)
