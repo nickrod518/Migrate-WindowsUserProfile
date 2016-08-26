@@ -148,13 +148,15 @@ begin {
         $OpenDirectoryDialog = New-Object Windows.Forms.FolderBrowserDialog
         $OpenDirectoryDialog.RootFolder = 'Desktop'
         $OpenDirectoryDialog.SelectedPath = 'C:\'
-        $OpenDirectoryDialog.ShowDialog() | Out-Null
+        $Result = $OpenDirectoryDialog.ShowDialog()
         $SelectedDirectory = $OpenDirectoryDialog.SelectedPath
         try {
-            # If user hits cancel it could cause attempt to add null path, so check that there's something there
-            if ($SelectedDirectory) {
+            # If user hits cancel don't add the path
+            if ($Result -eq 'OK') {
                 Update-Log "Adding to extra directories: $SelectedDirectory."
                 $ExtraDirectoriesDataGridView.Rows.Add($SelectedDirectory)
+            } else {
+                Update-Log "Add directory action cancelled by user." -Color Yellow
             }
         } catch {
             Update-Log "There was a problem with the directory you chose: $($_.Exception.Message)" -Color Red
@@ -477,7 +479,7 @@ $ExtraDirectoryXML
             $Config = Set-Config
 
             # Generate parameter for logging
-            $Logs = "/l:$Destination\scan.log /progress:$Destination\scan_progress.log"
+            $Logs = "`"/l:$Destination\scan.log`" `"/progress:$Destination\scan_progress.log`""
 
             # Set parameter for whether save state is compressed
             if ($UncompressedCheckBox.Checked -eq $true) {
@@ -487,7 +489,7 @@ $ExtraDirectoryXML
             }
 
             # Overwrite existing save state, use volume shadow copy method, exclude all but the selected user
-            $Arguments = "$Destination /i:$Config /o /vsc /ue:*\* /ui:$User $Uncompressed $Logs"
+            $Arguments = "`"$Destination`" `"/i:$Config`" /o /vsc /ue:*\* `"/ui:$User`" $Uncompressed $Logs"
 
             # Begin saving user state to new computer
             Update-Log "Command used:"
@@ -566,7 +568,7 @@ $ExtraDirectoryXML
         }
 
         # Generate arguments for load state process
-        $Logs = "/l:$Destination\load.log /progress:$Destination\load_progress.log"
+        $Logs = "`"/l:$Destination\load.log`" `"/progress:$Destination\load_progress.log`""
 
         # Set parameter for whether save state is compressed
         if ($UncompressedSource -eq $true) {
@@ -587,9 +589,9 @@ $ExtraDirectoryXML
             }
 
             Update-Log "$OldUser will be migrated as $NewUser."
-            $Arguments = "$Destination /i:$Destination\Config.xml /mu:$($OldUser):$NewUser $Uncompressed $Logs"
+            $Arguments = "`"$Destination`" `"/i:$Destination\Config.xml`" `"/mu:$($OldUser):$NewUser`" $Uncompressed $Logs"
         } else {
-            $Arguments = "$Destination /i:$Destination\Config.xml $Uncompressed $Logs"
+            $Arguments = "`"$Destination`" `"/i:$Destination\Config.xml`" $Uncompressed $Logs"
         }
 
         # Begin loading user state to this computer
@@ -708,7 +710,7 @@ $ExtraDirectoryXML
         Update-Log "               / \   ___ ___(_)___| |_ __ _ _ __ | |_   " -Color 'LightBlue'
         Update-Log "              / _ \ / __/ __| / __| __/ _`` | '_ \| __|  " -Color 'LightBlue'
         Update-Log "             / ___ \\__ \__ \ \__ \ || (_| | | | | |_   " -Color 'LightBlue'
-        Update-Log "            /_/   \_\___/___/_|___/\__\__,_|_| |_|\__| v1.6" -Color 'LightBlue'
+        Update-Log "            /_/   \_\___/___/_|___/\__\__,_|_| |_|\__| v1.7" -Color 'LightBlue'
         Update-Log
         Update-Log '                        by Nick Rodriguez' -Color 'Gold'
         Update-Log
