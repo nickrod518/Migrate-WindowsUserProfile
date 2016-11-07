@@ -14,7 +14,7 @@
 
 begin {
 	###################################################################################################################
-    # Default configuration options
+    # Default configuration options - make edits starting here
 
 	# Default domain to use for profile creation
     $Script:DefaultDomain = 'DOMAIN'
@@ -22,7 +22,7 @@ begin {
 	# Verify that the user running this script has this extension in their username to ensure admin rights
     $Script:AdminExtension = '-admin'
 
-	# Use this to disallow migrations on IP's other than what's specified (e.g. set to '10.*' to only allow IP's starting with 10)
+	# Use this to disallow migrations on IP's other than what's specified
     $Script:ValidIPAddress = '*'
 
 	# Path to store the migration data on the new computer, directory will be created if it doesn't exist
@@ -30,18 +30,17 @@ begin {
 
 	# Default user profile items to exclude from migration, more info found here: 
 	# https://technet.microsoft.com/en-us/library/cc722303(v=ws.10).aspx
-	# If you want nothing excluded, set this to an empty string
-    $Script:DefaultExclude = @"
-        <exclude>
-            <objectSet>
-                <pattern type="File">%CSIDL_FAVORITES%\* [*]</pattern>
-                <pattern type="File">%CSIDL_PERSONAL%\* [*]</pattern>
-            </objectSet>
-        </exclude>
-"@
-
-	# Message to user describing default data that will be migrated
-	$Script:ProfileMigrationSummary = "All data within user profile, excluding Documents and Favorites, will be migrated."
+    $Script:DefaultIncludeAppData = $true
+    $Script:DefaultIncludeLocalAppData = $true
+    $Script:DefaultIncludePrinters = $true
+    $Script:DefaultIncludeRecycleBin = $true
+    $Script:DefaultIncludeMyDocuments = $false
+    $Script:DefaultIncludeWallpapers = $true
+    $Script:DefaultIncludeDesktop = $true
+    $Script:DefaultIncludeFavorites = $false
+    $Script:DefaultIncludeMyMusic = $true
+    $Script:DefaultIncludeMyPictures = $true
+    $Script:DefaultIncludeMyVideo = $true
 
 	# Get USMT binary path according to OS architecture. If you used the zip provided, unzip in the same directory as this script
     if ((Get-WmiObject Win32_OperatingSystem).OSArchitecture -eq '64-bit') { 
@@ -49,14 +48,22 @@ begin {
     } else { 
         $Script:USMTPath = '.\USMT\x86'
     }
+
+    # Users to additionially send every migration result to
+    $Script:DefaultEmailEnabled = $false
+    $Script:DefaultEmailSender = 'MigrationAlert@company.com'
+    $Script:DefaultEmailRecipients = @('my.email@company.com')
+    $Script:DefaultSMTPServer = 'smtp.domain.local'
     
-	# End of configuration options
+	# End of configuration options - make no edits past this
 	###################################################################################################################
-    
+
     function Update-Log {
         param(
             [string] $Message,
+
             [string] $Color = 'White',
+
             [switch] $NoNewLine
         )
 
@@ -81,15 +88,19 @@ begin {
 
         # Return each profile on this computer
         Get-ItemProperty -Path $RegKey | ForEach-Object {
-            $SID = New-object System.Security.Principal.SecurityIdentifier($_.PSChildName)
-            try { 
-                $User = $SID.Translate([System.Security.Principal.NTAccount]).Value
-                # Don't show NT Authority or local accounts
-                if (($User -notlike 'NT Authority\*') -and ($User -notlike "$(Get-HostName)\*")) {
-                    $ProfileComboBox.Items.Add($User) | Out-Null
+            try {
+                $SID = New-object System.Security.Principal.SecurityIdentifier($_.PSChildName)
+                try { 
+                    $User = $SID.Translate([System.Security.Principal.NTAccount]).Value
+                    # Don't show NT Authority or local accounts
+                    if (($User -notlike 'NT Authority\*') -and ($User -notlike "$(Get-HostName)\*")) {
+                        $ProfileComboBox.Items.Add($User) | Out-Null
+                    }
+                } catch {
+                    Update-Log "Error while translating $SID to a user name." -Color 'Yellow'
                 }
             } catch {
-                Update-Log "Error while translating $SID to a user name." -Color 'Yellow'
+                Update-Log "Error while translating $($_.PSChildName) to SID." -Color 'Yellow'
             }
         }
     }
@@ -208,6 +219,142 @@ begin {
         } else {
             Update-Log 'No extra directories will be included.'
         }
+        
+        Update-Log 'Data to be included:'
+        foreach ($Control in $InclusionsGroupBox.Controls) { if ($Control.Checked) { Update-Log $Control.Text } }
+
+        $ExcludedDataXML = @"
+            $(
+                if (-not $IncludePrintersCheckBox.Checked) { "<pattern type=`"File`">%CSIDL_PRINTERS%\* [*]</pattern>`n" }
+                if (-not $IncludeRecycleBinCheckBox.Checked) { "<pattern type=`"File`">%CSIDL_BITBUCKET%\* [*]</pattern>`n" }
+                if (-not $IncludeMyDocumentsCheckBox.Checked) {
+                    "<pattern type=`"File`">%CSIDL_MYDOCUMENTS%\* [*]</pattern>`n"
+                    "<pattern type=`"File`">%CSIDL_PERSONAL%\* [*]</pattern>`n"
+                }
+                if (-not $IncludeDesktopCheckBox.Checked) {
+                    "<pattern type=`"File`">%CSIDL_DESKTOP%\* [*]</pattern>`n"
+                    "<pattern type=`"File`">%CSIDL_DESKTOPDIRECTORY%\* [*]</pattern>`n"
+                }
+                if (-not $IncludeFavoritesCheckBox.Checked) { "<pattern type=`"File`">%CSIDL_FAVORITES%\* [*]</pattern>`n" }
+                if (-not $IncludeMyMusicCheckBox.Checked) { "<pattern type=`"File`">%CSIDL_MYMUSIC%\* [*]</pattern>`n" }
+                if (-not $IncludeMyPicturesCheckBox.Checked) { "<pattern type=`"File`">%CSIDL_MYPICTURES%\* [*]</pattern>`n" }
+                if (-not $IncludeMyVideoCheckBox.Checked) { "<pattern type=`"File`">%CSIDL_MYVIDEO%\* [*]</pattern>`n" }
+            )
+"@
+
+        $AppDataXML = if ($IncludeAppDataCheckBox.Checked) {
+            @"
+            <!-- This component migrates all user app data -->
+            <component type=`"Documents`" context=`"User`">
+                <displayName>App Data</displayName>
+                <paths>
+                    <path type="File">%CSIDL_APPDATA%</path>
+                </paths>
+                <role role="Data">
+                    <detects>
+                        <detect>
+                            <condition>MigXmlHelper.DoesObjectExist("File","%CSIDL_APPDATA%")</condition>
+                        </detect>
+                    </detects>
+                    <rules>
+                        <include filter='MigXmlHelper.IgnoreIrrelevantLinks()'>
+                            <objectSet>
+                                <pattern type="File">%CSIDL_APPDATA%\* [*]</pattern>
+                            </objectSet>
+                        </include>
+                        <merge script='MigXmlHelper.DestinationPriority()'>
+                            <objectSet>
+                                <pattern type="File">%CSIDL_APPDATA%\* [*]</pattern>
+                            </objectSet>
+                        </merge>
+                    </rules>
+                </role>
+            </component>
+"@
+        }
+
+        $LocalAppDataXML = if ($IncludeLocalAppDataCheckBox.Checked) {
+            @"
+            <!-- This component migrates all user local app data -->
+            <component type=`"Documents`" context=`"User`">
+                <displayName>Local App Data</displayName>
+                <paths>
+                    <path type="File">%CSIDL_LOCAL_APPDATA%</path>
+                </paths>
+                <role role="Data">
+                    <detects>
+                        <detect>
+                            <condition>MigXmlHelper.DoesObjectExist("File","%CSIDL_LOCAL_APPDATA%")</condition>
+                        </detect>
+                    </detects>
+                    <rules>
+                        <include filter='MigXmlHelper.IgnoreIrrelevantLinks()'>
+                            <objectSet>
+                                <pattern type="File">%CSIDL_LOCAL_APPDATA%\* [*]</pattern>
+                            </objectSet>
+                        </include>
+                        <merge script='MigXmlHelper.DestinationPriority()'>
+                            <objectSet>
+                                <pattern type="File">%CSIDL_LOCAL_APPDATA%\* [*]</pattern>
+                            </objectSet>
+                        </merge>
+                    </rules>
+                </role>
+            </component>
+"@
+        }
+
+        $WallpapersXML = if ($IncludeWallpapersCheckBox.Checked) {
+            @"
+            <!-- This component migrates wallpaper settings -->
+            <component type="System" context="User">
+                <displayName>Wallpapers</displayName>
+                <role role="Settings">
+                    <rules>
+                        <include>
+                            <objectSet>
+                                <pattern type="Registry">HKCU\Control Panel\Desktop [Pattern]</pattern>
+                                <pattern type="Registry">HKCU\Control Panel\Desktop [PatternUpgrade]</pattern>
+                                <pattern type="Registry">HKCU\Control Panel\Desktop [TileWallpaper]</pattern>
+                                <pattern type="Registry">HKCU\Control Panel\Desktop [WallPaper]</pattern>
+                                <pattern type="Registry">HKCU\Control Panel\Desktop [WallpaperStyle]</pattern>
+                                <pattern type="Registry">HKCU\Software\Microsoft\Windows\CurrentVersion\Themes [SetupVersion]</pattern>
+                                <pattern type="Registry">HKCU\Software\Microsoft\Internet Explorer\Desktop\General [BackupWallpaper]</pattern>
+                                <pattern type="Registry">HKCU\Software\Microsoft\Internet Explorer\Desktop\General [TileWallpaper]</pattern>
+                                <pattern type="Registry">HKCU\Software\Microsoft\Internet Explorer\Desktop\General [Wallpaper]</pattern>
+                                <pattern type="Registry">HKCU\Software\Microsoft\Internet Explorer\Desktop\General [WallpaperFileTime]</pattern>
+                                <pattern type="Registry">HKCU\Software\Microsoft\Internet Explorer\Desktop\General [WallpaperLocalFileTime]</pattern>
+                                <pattern type="Registry">HKCU\Software\Microsoft\Internet Explorer\Desktop\General [WallpaperStyle]</pattern>
+                                <content filter="MigXmlHelper.ExtractSingleFile(NULL, NULL)">
+                                    <objectSet>
+                                        <pattern type="Registry">HKCU\Control Panel\Desktop [WallPaper]</pattern>
+                                        <pattern type="Registry">HKCU\Software\Microsoft\Internet Explorer\Desktop\General [BackupWallpaper]</pattern>
+                                        <pattern type="Registry">HKCU\Software\Microsoft\Internet Explorer\Desktop\General [Wallpaper]</pattern>
+                                    </objectSet>
+                                </content>
+                            </objectSet>
+                        </include>
+                    </rules>
+                </role>
+            </component>
+
+            <!-- This component migrates wallpaper files -->
+            <component type="Documents" context="System">
+                <displayName>Move JPG and BMP</displayName>
+                <role role="Data">
+                    <rules>
+                        <include>
+                            <objectSet>
+                                <pattern type="File"> %windir% [*.bmp]</pattern>
+                                <pattern type="File"> %windir%\web\wallpaper [*.jpg]</pattern>
+                                <pattern type="File"> %windir%\web\wallpaper [*.bmp]</pattern>
+                            </objectSet>
+                        </include>
+                    </rules>
+                </role>
+            </component>
+"@
+}
 
         $ConfigContent = @"
 <?xml version="1.0" encoding="UTF-8"?>
@@ -219,7 +366,7 @@ begin {
 
 $ExtraDirectoryXML
 
-    <!-- This component migrates all user data except favorites and documents -->
+    <!-- This component migrates all user data except specified exclusions -->
     <component type="Documents" context="User">
         <displayName>Documents</displayName>
         <role role="Data">
@@ -234,7 +381,11 @@ $ExtraDirectoryXML
                         <script>MigXmlHelper.GenerateDocPatterns ("FALSE","FALSE","FALSE")</script>
                     </objectSet>
                 </exclude>
-                $DefaultExclude
+                <exclude>
+                    <objectSet>
+$ExcludedDataXML
+                    </objectSet>
+                </exclude>
                 <contentModify script="MigXmlHelper.MergeShellLibraries('TRUE','TRUE')">
                     <objectSet>
                         <pattern type="File">*[*.library-ms]</pattern>
@@ -249,80 +400,12 @@ $ExtraDirectoryXML
         </role>
     </component>
 
-    <!-- This component migrates all user app data -->
-    <component type="Documents" context="User">
-        <displayName>App Data</displayName>
-        <paths>
-            <path type="File">%CSIDL_APPDATA%</path>
-        </paths>
-        <role role="Data">
-            <detects>
-                <detect>
-                    <condition>MigXmlHelper.DoesObjectExist("File","%CSIDL_APPDATA%")</condition>
-                </detect>
-            </detects>
-            <rules>
-                <include filter='MigXmlHelper.IgnoreIrrelevantLinks()'>
-                    <objectSet>
-                        <pattern type="File">%CSIDL_APPDATA%\* [*]</pattern>
-                    </objectSet>
-                </include>
-                <merge script='MigXmlHelper.DestinationPriority()'>
-                    <objectSet>
-                        <pattern type="File">%CSIDL_APPDATA%\* [*]</pattern>
-                    </objectSet>
-                </merge>
-            </rules>
-        </role>
-    </component>
+$AppDataXML
 
-    <!-- This component migrates wallpaper settings -->
-    <component type="System" context="User">
-        <displayName>Wallpapers</displayName>
-        <role role="Settings">
-            <rules>
-                <include>
-                    <objectSet>
-                        <pattern type="Registry">HKCU\Control Panel\Desktop [Pattern]</pattern>
-                        <pattern type="Registry">HKCU\Control Panel\Desktop [PatternUpgrade]</pattern>
-                        <pattern type="Registry">HKCU\Control Panel\Desktop [TileWallpaper]</pattern>
-                        <pattern type="Registry">HKCU\Control Panel\Desktop [WallPaper]</pattern>
-                        <pattern type="Registry">HKCU\Control Panel\Desktop [WallpaperStyle]</pattern>
-                        <pattern type="Registry">HKCU\Software\Microsoft\Windows\CurrentVersion\Themes [SetupVersion]</pattern>
-                        <pattern type="Registry">HKCU\Software\Microsoft\Internet Explorer\Desktop\General [BackupWallpaper]</pattern>
-                        <pattern type="Registry">HKCU\Software\Microsoft\Internet Explorer\Desktop\General [TileWallpaper]</pattern>
-                        <pattern type="Registry">HKCU\Software\Microsoft\Internet Explorer\Desktop\General [Wallpaper]</pattern>
-                        <pattern type="Registry">HKCU\Software\Microsoft\Internet Explorer\Desktop\General [WallpaperFileTime]</pattern>
-                        <pattern type="Registry">HKCU\Software\Microsoft\Internet Explorer\Desktop\General [WallpaperLocalFileTime]</pattern>
-                        <pattern type="Registry">HKCU\Software\Microsoft\Internet Explorer\Desktop\General [WallpaperStyle]</pattern>
-                        <content filter="MigXmlHelper.ExtractSingleFile(NULL, NULL)">
-                            <objectSet>
-                                <pattern type="Registry">HKCU\Control Panel\Desktop [WallPaper]</pattern>
-                                <pattern type="Registry">HKCU\Software\Microsoft\Internet Explorer\Desktop\General [BackupWallpaper]</pattern>
-                                <pattern type="Registry">HKCU\Software\Microsoft\Internet Explorer\Desktop\General [Wallpaper]</pattern>
-                            </objectSet>
-                        </content>
-                    </objectSet>
-                </include>
-            </rules>
-        </role>
-    </component>
+$LocalAppDataXML
 
-    <!-- This component migrates wallpaper files -->
-    <component type="Documents" context="System">
-        <displayName>Move JPG and BMP</displayName>
-        <role role="Data">
-            <rules>
-                <include>
-                    <objectSet>
-                        <pattern type="File"> %windir% [*.bmp]</pattern>
-                        <pattern type="File"> %windir%\web\wallpaper [*.jpg]</pattern>
-                        <pattern type="File"> %windir%\web\wallpaper [*.bmp]</pattern>
-                    </objectSet>
-                </include>
-            </rules>
-        </role>
-    </component>
+$WallpapersXML
+
 </migration>
 "@
 
@@ -373,12 +456,42 @@ $ExtraDirectoryXML
 
 		if ($ActionType -eq 'load') {
 			Update-Log 'A reboot is recommended.' -Color 'Yellow'
-		}
+        
+            $EmailSubject = "Migration Load Results of $($OldComputerNameTextBox_NewPage.Text) to $($NewComputerNameTextBox_NewPage.Text)"
+		} else {
+            $EmailSubject = "Migration Save Results of $($OldComputerNameTextBox_OldPage.Text) to $($NewComputerNameTextBox_OldPage.Text)"
+        }
+
+        if ($EmailCheckBox.Checked) {
+            if ($SMTPConnectionCheckBox.Checked -or (Test-Connection -ComputerName $SMTPServerTextBox.Text -Quiet)) {
+                $SMTPConnectionCheckBox.Checked = $true
+
+                $EmailRecipients = @()
+
+                $EmailRecipientsDataGridView.Rows | ForEach-Object {
+                    $CurrentRowIndex = $_.Index
+                    $EmailRecipients += $EmailRecipientsDataGridView.Item(0, $CurrentRowIndex).Value
+                }
+
+                Update-Log "Emailing migration results to: $EmailRecipients"
+
+                try {
+                    Send-MailMessage -From $EmailSenderTextBox.Text -To $EmailRecipients `
+                        -Subject $EmailSubject -Body $LogTextBox.Text -SmtpServer $SMTPServerTextBox.Text `
+                        -Attachments "$Destination\$ActionType.log"
+                } catch {
+                    Update-Log "Error occurred sending email: $($_.Exception.Message)" -Color 'Red'
+                }
+            } else {
+                Update-Log "Unable to send email of results because SMTP server [$($SMTPServerTextBox.Text)] is unreachable." -Color 'Yellow'
+            }
+        }
     }
 
     function Get-USMTProgress {
         param(
             [string] $Destination,
+
             [string] $ActionType
         )
 
@@ -512,7 +625,7 @@ $ExtraDirectoryXML
                 Update-Log 'Results:'
                 Get-USMTResults -ActionType 'scan'
             } catch {
-                Update-Log 'Scan state process not found.' -Color 'Red'
+                Update-Log $_.Exception.Message -Color 'Red'
             }
         }
     }
@@ -629,14 +742,16 @@ $ExtraDirectoryXML
                 Update-Log 'There was an issue when trying to remove old save state data.'
             }
         } catch {
-            Update-Log 'Load state process not found.' -Color 'Red'
+            Update-Log $_.Exception.Message -Color 'Red'
         }
     }
 
     function Test-ComputerConnection {
         param(
             [System.Windows.Forms.TextBox] $ComputerNameTextBox,
+
             [System.Windows.Forms.TextBox] $ComputerIPTextBox,
+
             [System.Windows.Forms.CheckBox] $ConnectionCheckBox
         )
 
@@ -648,7 +763,7 @@ $ExtraDirectoryXML
             # Try to update the computer's name with its IP address
             if ($ComputerNameTextBox.Text -eq '') {
                 try {
-                    Update-Log 'Computer name is blank, attempting to resolve...' -Color 'Yellow'
+                    Update-Log 'Computer name is blank, attempting to resolve...' -Color 'Yellow' -NoNewLine
                     $HostName = ([System.Net.Dns]::GetHostEntry($Computer)).HostName
                     $ComputerNameTextBox.Text = $HostName
                     Update-Log "Computer name set to $HostName."
@@ -661,7 +776,7 @@ $ExtraDirectoryXML
             $Computer = $ComputerNameTextBox.Text
             # Try to update the computer's IP address using its DNS name
             try {
-                Update-Log 'Computer IP address is blank, attempting to resolve...' -Color 'Yellow'
+                Update-Log 'Computer IP address is blank, attempting to resolve...' -Color 'Yellow' -NoNewLine
                 # Get the first IP address found, which is usually the primary adapter
                 $IPAddress = ([System.Net.Dns]::GetHostEntry($Computer)).AddressList.IPAddressToString.Split('.', 1)[0]
 
@@ -684,7 +799,7 @@ $ExtraDirectoryXML
                 return
             }
 
-            Update-Log "Testing connection to $Computer..."
+            Update-Log "Testing connection to $Computer..." -NoNewLine
 
             if (Test-Connection $Computer -Quiet) {
                 $ConnectionCheckBox.Checked = $true
@@ -710,7 +825,7 @@ $ExtraDirectoryXML
         Update-Log "               / \   ___ ___(_)___| |_ __ _ _ __ | |_   " -Color 'LightBlue'
         Update-Log "              / _ \ / __/ __| / __| __/ _`` | '_ \| __|  " -Color 'LightBlue'
         Update-Log "             / ___ \\__ \__ \ \__ \ || (_| | | | | |_   " -Color 'LightBlue'
-        Update-Log "            /_/   \_\___/___/_|___/\__\__,_|_| |_|\__| v1.7" -Color 'LightBlue'
+        Update-Log "            /_/   \_\___/___/_|___/\__\__,_|_| |_|\__| v2.0" -Color 'LightBlue'
         Update-Log
         Update-Log '                        by Nick Rodriguez' -Color 'Gold'
         Update-Log
@@ -925,12 +1040,12 @@ process {
     $SaveRemotelyCheckBox.Add_Click({
         if ($SaveRemotelyCheckBox.Checked -eq $true) {
             $OldComputerInfoGroupBox.Enabled = $true
-            Update-Log 'Local save destination disabled - ' -Color 'Yellow' -NoNewLine
-            Update-Log 'Save state will be stored on the new computer and network checks will be processed normally.'
+            Update-Log 'Local save destination disabled' -Color 'Yellow' -NoNewLine
+            Update-Log ' - Save state will be stored on the new computer and network checks will be processed normally.'
         } else {
             $OldComputerInfoGroupBox.Enabled = $false
-            Update-Log 'Local save destination enabled - ' -Color 'Yellow' -NoNewLine
-            Update-Log 'Save state will be stored locally and network checks will be skipped.'
+            Update-Log 'Local save destination enabled' -Color 'Yellow' -NoNewLine
+            Update-Log ' - Save state will be stored locally and network checks will be skipped.'
         }
     })
     $SaveDestinationGroupBox.Controls.Add($SaveRemotelyCheckBox)
@@ -954,17 +1069,200 @@ process {
     })
     $SaveDestinationGroupBox.Controls.Add($ResetSaveDestinationButton)
 
+    # Inclusions group box
+    $InclusionsGroupBox = New-Object System.Windows.Forms.GroupBox
+    $InclusionsGroupBox.Location = New-Object System.Drawing.Size(10, 110)
+    $InclusionsGroupBox.Size = New-Object System.Drawing.Size(220, 140)
+    $InclusionsGroupBox.Text = 'Data to Include'
+    $OldComputerTabPage.Controls.Add($InclusionsGroupBox)
+
+    # AppData check box CSIDL_APPDATA
+    $IncludeAppDataCheckBox = New-Object System.Windows.Forms.CheckBox
+    $IncludeAppDataCheckBox.Checked = $DefaultIncludeAppData
+    $IncludeAppDataCheckBox.Text = 'AppData'
+    $IncludeAppDataCheckBox.Location = New-Object System.Drawing.Size(10, 15) 
+    $IncludeAppDataCheckBox.Size = New-Object System.Drawing.Size(100, 20)
+    $IncludeAppDataCheckBox.Add_Click({
+        $ComponentName = $IncludeAppDataCheckBox.Text
+        if ($IncludeAppDataCheckBox.Checked -eq $true) {
+            Update-Log "$ComponentName will be included."
+        } else {
+            Update-Log "$ComponentName will not be included."
+        }
+    })
+    $InclusionsGroupBox.Controls.Add($IncludeAppDataCheckBox)
+
+    # Local AppData check box CSIDL_LOCAL_APPDATA
+    $IncludeLocalAppDataCheckBox = New-Object System.Windows.Forms.CheckBox
+    $IncludeLocalAppDataCheckBox.Checked = $DefaultIncludeLocalAppData
+    $IncludeLocalAppDataCheckBox.Text = 'Local AppData'
+    $IncludeLocalAppDataCheckBox.Location = New-Object System.Drawing.Size(10, 35) 
+    $IncludeLocalAppDataCheckBox.Size = New-Object System.Drawing.Size(100, 20)
+    $IncludeLocalAppDataCheckBox.Add_Click({
+        $ComponentName = $IncludeLocalAppDataCheckBox.Text
+        if ($IncludeLocalAppDataCheckBox.Checked -eq $true) {
+            Update-Log "$ComponentName will be included."
+        } else {
+            Update-Log "$ComponentName will not be included." -Color Yellow
+        }
+    })
+    $InclusionsGroupBox.Controls.Add($IncludeLocalAppDataCheckBox)
+    
+    # Printers check box CSIDL_PRINTERS
+    $IncludePrintersCheckBox = New-Object System.Windows.Forms.CheckBox
+    $IncludePrintersCheckBox.Checked = $DefaultIncludePrinters
+    $IncludePrintersCheckBox.Text = 'Printers'
+    $IncludePrintersCheckBox.Location = New-Object System.Drawing.Size(10, 55) 
+    $IncludePrintersCheckBox.Size = New-Object System.Drawing.Size(100, 20)
+    $IncludePrintersCheckBox.Add_Click({
+        $ComponentName = $IncludePrintersCheckBox.Text
+        if ($IncludePrintersCheckBox.Checked -eq $true) {
+            Update-Log "$ComponentName will be included."
+        } else {
+            Update-Log "$ComponentName will not be included." -Color Yellow
+        }
+    })
+    $InclusionsGroupBox.Controls.Add($IncludePrintersCheckBox)
+    
+    # Recycle Bin check box CSIDL_BITBUCKET
+    $IncludeRecycleBinCheckBox = New-Object System.Windows.Forms.CheckBox
+    $IncludeRecycleBinCheckBox.Checked = $DefaultIncludeRecycleBin
+    $IncludeRecycleBinCheckBox.Text = 'Recycle Bin'
+    $IncludeRecycleBinCheckBox.Location = New-Object System.Drawing.Size(10, 75) 
+    $IncludeRecycleBinCheckBox.Size = New-Object System.Drawing.Size(100, 20)
+    $IncludeRecycleBinCheckBox.Add_Click({
+        $ComponentName = $IncludeRecycleBinCheckBox.Text
+        if ($IncludeRecycleBinCheckBox.Checked -eq $true) {
+            Update-Log "$ComponentName will be included."
+        } else {
+            Update-Log "$ComponentName will not be included." -Color Yellow
+        }
+    })
+    $InclusionsGroupBox.Controls.Add($IncludeRecycleBinCheckBox)
+
+    # My Documents check box CSIDL_MYDOCUMENTS and CSIDL_PERSONAL
+    $IncludeMyDocumentsCheckBox = New-Object System.Windows.Forms.CheckBox
+    $IncludeMyDocumentsCheckBox.Checked = $DefaultIncludeMyDocuments
+    $IncludeMyDocumentsCheckBox.Text = 'My Documents'
+    $IncludeMyDocumentsCheckBox.Location = New-Object System.Drawing.Size(10, 95) 
+    $IncludeMyDocumentsCheckBox.Size = New-Object System.Drawing.Size(100, 20)
+    $IncludeMyDocumentsCheckBox.Add_Click({
+        $ComponentName = $IncludeMyDocumentsCheckBox.Text
+        if ($IncludeMyDocumentsCheckBox.Checked -eq $true) {
+            Update-Log "$ComponentName will be included."
+        } else {
+            Update-Log "$ComponentName will not be included." -Color Yellow
+        }
+    })
+    $InclusionsGroupBox.Controls.Add($IncludeMyDocumentsCheckBox)
+
+    # Wallpapers
+    $IncludeWallpapersCheckBox = New-Object System.Windows.Forms.CheckBox
+    $IncludeWallpapersCheckBox.Checked = $DefaultIncludeWallpapers
+    $IncludeWallpapersCheckBox.Text = 'Wallpapers'
+    $IncludeWallpapersCheckBox.Location = New-Object System.Drawing.Size(10, 115) 
+    $IncludeWallpapersCheckBox.Size = New-Object System.Drawing.Size(100, 20)
+    $IncludeWallpapersCheckBox.Add_Click({
+        $ComponentName = $IncludeWallpapersCheckBox.Text
+        if ($IncludeWallpapersCheckBox.Checked -eq $true) {
+            Update-Log "$ComponentName will be included."
+        } else {
+            Update-Log "$ComponentName will not be included." -Color Yellow
+        }
+    })
+    $InclusionsGroupBox.Controls.Add($IncludeWallpapersCheckBox)
+    
+    # Desktop check box CSIDL_DESKTOP and CSIDL_DESKTOPDIRECTORY
+    $IncludeDesktopCheckBox = New-Object System.Windows.Forms.CheckBox
+    $IncludeDesktopCheckBox.Checked = $DefaultIncludeDesktop
+    $IncludeDesktopCheckBox.Text = 'Desktop'
+    $IncludeDesktopCheckBox.Location = New-Object System.Drawing.Size(110, 15) 
+    $IncludeDesktopCheckBox.Size = New-Object System.Drawing.Size(100, 20)
+    $IncludeDesktopCheckBox.Add_Click({
+        $ComponentName = $IncludeDesktopCheckBox.Text
+        if ($IncludeDesktopCheckBox.Checked -eq $true) {
+            Update-Log "$ComponentName will be included."
+        } else {
+            Update-Log "$ComponentName will not be included." -Color Yellow
+        }
+    })
+    $InclusionsGroupBox.Controls.Add($IncludeDesktopCheckBox)
+
+    # Favorites check box CSIDL_FAVORITES
+    $IncludeFavoritesCheckBox = New-Object System.Windows.Forms.CheckBox
+    $IncludeFavoritesCheckBox.Checked = $DefaultIncludeFavorites
+    $IncludeFavoritesCheckBox.Text = 'Favorites'
+    $IncludeFavoritesCheckBox.Location = New-Object System.Drawing.Size(110, 35) 
+    $IncludeFavoritesCheckBox.Size = New-Object System.Drawing.Size(100, 20)
+    $IncludeFavoritesCheckBox.Add_Click({
+        $ComponentName = $IncludeFavoritesCheckBox.Text
+        if ($IncludeFavoritesCheckBox.Checked -eq $true) {
+            Update-Log "$ComponentName will be included."
+        } else {
+            Update-Log "$ComponentName will not be included." -Color Yellow
+        }
+    })
+    $InclusionsGroupBox.Controls.Add($IncludeFavoritesCheckBox)
+
+    # My Music check box CSIDL_MYMUSIC
+    $IncludeMyMusicCheckBox = New-Object System.Windows.Forms.CheckBox
+    $IncludeMyMusicCheckBox.Checked = $DefaultIncludeMyMusic
+    $IncludeMyMusicCheckBox.Text = 'My Music'
+    $IncludeMyMusicCheckBox.Location = New-Object System.Drawing.Size(110, 55) 
+    $IncludeMyMusicCheckBox.Size = New-Object System.Drawing.Size(100, 20)
+    $IncludeMyMusicCheckBox.Add_Click({
+        $ComponentName = $IncludeMyMusicCheckBox.Text
+        if ($IncludeMyMusicCheckBox.Checked -eq $true) {
+            Update-Log "$ComponentName will be included."
+        } else {
+            Update-Log "$ComponentName will not be included." -Color Yellow
+        }
+    })
+    $InclusionsGroupBox.Controls.Add($IncludeMyMusicCheckBox)
+
+    # My Pictures check box CSIDL_MYPICTURES
+    $IncludeMyPicturesCheckBox = New-Object System.Windows.Forms.CheckBox
+    $IncludeMyPicturesCheckBox.Checked = $DefaultIncludeMyPictures
+    $IncludeMyPicturesCheckBox.Text = 'My Pictures'
+    $IncludeMyPicturesCheckBox.Location = New-Object System.Drawing.Size(110, 75) 
+    $IncludeMyPicturesCheckBox.Size = New-Object System.Drawing.Size(100, 20)
+    $IncludeMyPicturesCheckBox.Add_Click({
+        $ComponentName = $IncludeMyPicturesCheckBox.Text
+        if ($IncludeMyPicturesCheckBox.Checked -eq $true) {
+            Update-Log "$ComponentName will be included."
+        } else {
+            Update-Log "$ComponentName will not be included." -Color Yellow
+        }
+    })
+    $InclusionsGroupBox.Controls.Add($IncludeMyPicturesCheckBox)
+
+    # My Video check box CSIDL_MYVIDEO
+    $IncludeMyVideoCheckBox = New-Object System.Windows.Forms.CheckBox
+    $IncludeMyVideoCheckBox.Checked = $DefaultIncludeMyVideo
+    $IncludeMyVideoCheckBox.Text = 'My Video'
+    $IncludeMyVideoCheckBox.Location = New-Object System.Drawing.Size(110, 95) 
+    $IncludeMyVideoCheckBox.Size = New-Object System.Drawing.Size(100, 20)
+    $IncludeMyVideoCheckBox.Add_Click({
+        $ComponentName = $IncludeMyVideoCheckBox.Text
+        if ($IncludeMyVideoCheckBox.Checked -eq $true) {
+            Update-Log "$ComponentName will be included."
+        } else {
+            Update-Log "$ComponentName will not be included." -Color Yellow
+        }
+    })
+    $InclusionsGroupBox.Controls.Add($IncludeMyVideoCheckBox)
+
     # Extra directories selection group box
     $ExtraDirectoriesGroupBox = New-Object System.Windows.Forms.GroupBox
-    $ExtraDirectoriesGroupBox.Location = New-Object System.Drawing.Size(10, 110)
-    $ExtraDirectoriesGroupBox.Size = New-Object System.Drawing.Size(220, 350)
-    $ExtraDirectoriesGroupBox.Text = 'Extra Directories'
+    $ExtraDirectoriesGroupBox.Location = New-Object System.Drawing.Size(10, 260)
+    $ExtraDirectoriesGroupBox.Size = New-Object System.Drawing.Size(220, 200)
+    $ExtraDirectoriesGroupBox.Text = 'Extra Directories to Include'
     $OldComputerTabPage.Controls.Add($ExtraDirectoriesGroupBox)
     
     # Extra directories data table
     $ExtraDirectoriesDataGridView = New-Object System.Windows.Forms.DataGridView
     $ExtraDirectoriesDataGridView.Location = New-Object System.Drawing.Size(5, 20)
-    $ExtraDirectoriesDataGridView.Size = New-Object System.Drawing.Size(210, 320)
+    $ExtraDirectoriesDataGridView.Size = New-Object System.Drawing.Size(210, 170)
     $ExtraDirectoriesDataGridView.ReadOnly = $true
     $ExtraDirectoriesDataGridView.AllowUserToAddRows = $false
     $ExtraDirectoriesDataGridView.AllowUserToResizeRows = $false
@@ -978,7 +1276,7 @@ process {
 
     # Remove Extra directory button
     $RemoveExtraDirectoryButton = New-Object System.Windows.Forms.Button
-    $RemoveExtraDirectoryButton.Location = New-Object System.Drawing.Size(0, 300)
+    $RemoveExtraDirectoryButton.Location = New-Object System.Drawing.Size(0, 150)
     $RemoveExtraDirectoryButton.Size = New-Object System.Drawing.Size(20, 20)
     $RemoveExtraDirectoryButton.Text = '-'
     $RemoveExtraDirectoryButton.Font = 'Consolas, 14'
@@ -987,7 +1285,7 @@ process {
 
     # Add Extra directory button
     $AddExtraDirectoryButton = New-Object System.Windows.Forms.Button
-    $AddExtraDirectoryButton.Location = New-Object System.Drawing.Size(20, 300)
+    $AddExtraDirectoryButton.Location = New-Object System.Drawing.Size(20, 150)
     $AddExtraDirectoryButton.Size = New-Object System.Drawing.Size(20, 20)
     $AddExtraDirectoryButton.Text = '+'
     $AddExtraDirectoryButton.Font = 'Consolas, 14'
@@ -1001,11 +1299,11 @@ process {
     $UncompressedCheckBox.Size = New-Object System.Drawing.Size(300, 30)
     $UncompressedCheckBox.Add_Click({
         if ($UncompressedCheckBox.Checked -eq $true) {
-            Update-Log 'Uncompressed save state enabled - ' -Color 'Yellow' -NoNewLine
-            Update-Log 'Save state will be stored as uncompressed flat files.'
+            Update-Log 'Uncompressed save state enabled' -Color 'Yellow' -NoNewLine
+            Update-Log ' - Save state will be stored as uncompressed flat files.'
         } else {
-            Update-Log 'Uncompressed save state disabled - ' -Color 'Yellow' -NoNewLine
-            Update-Log 'Save state will be stored as a compressed file.'
+            Update-Log 'Uncompressed save state disabled' -Color 'Yellow' -NoNewLine
+            Update-Log ' - Save state will be stored as a compressed file.'
         }
     })
     $OldComputerTabPage.Controls.Add($UncompressedCheckBox)
@@ -1059,6 +1357,7 @@ process {
     $OldComputerNameTextBox_NewPage.ReadOnly = $true
     $OldComputerNameTextBox_NewPage.Location = New-Object System.Drawing.Size(100, 34) 
     $OldComputerNameTextBox_NewPage.Size = New-Object System.Drawing.Size(120, 20)
+    $OldComputerNameTextBox_NewPage.Text = Get-SaveState
     $NewComputerInfoGroupBox.Controls.Add($OldComputerNameTextBox_NewPage)
 
     # Old Computer IP text box
@@ -1195,16 +1494,6 @@ process {
     $NewUserNameTextBox.Size = New-Object System.Drawing.Size(80, 20)
 	$NewUserNameTextBox.Text = $env:USERNAME
     $CrossDomainMigrationGroupBox.Controls.Add($NewUserNameTextBox)
-    
-    # Populate old user data if DomainMigration.txt file exists, otherwise disable group box
-    if (Test-Path "$MigrationStorePath\$($OldComputerNameTextBox_NewPage.Text)\DomainMigration.txt") {
-        $OldUser = Get-Content "$MigrationStorePath\$($OldComputerNameTextBox_NewPage.Text)\DomainMigration.txt"
-        $OldDomainTextBox.Text = $OldUser.Split('\')[0]
-        $OldUserNameTextBox.Text = $OldUser.Split('\')[1]
-    } else {
-        $CrossDomainMigrationGroupBox.Enabled = $false
-        $CrossDomainMigrationGroupBox.Hide()
-    }
 
     # Override check box
     $OverrideCheckBox = New-Object System.Windows.Forms.CheckBox
@@ -1214,12 +1503,12 @@ process {
     $OverrideCheckBox.Add_Click({
         if ($OverrideCheckBox.Checked -eq $true) {
             $NewComputerInfoGroupBox.Enabled = $false
-            Update-Log 'Network connection override enabled - ' -Color 'Yellow' -NoNewLine
-            Update-Log 'Save state process on old computer is assumed to be completed and no network checks will be processed during load state.'
+            Update-Log 'Network connection override enabled' -Color 'Yellow' -NoNewLine
+            Update-Log ' - Save state process on old computer is assumed to be completed and no network checks will be processed during load state.'
         } else {
             $NewComputerInfoGroupBox.Enabled = $true
-            Update-Log 'Network connection override enabled - ' -Color 'Yellow' -NoNewLine
-            Update-Log 'Network checks will be processed during load state.'
+            Update-Log 'Network connection override enabled' -Color 'Yellow' -NoNewLine
+            Update-Log ' - Network checks will be processed during load state.'
         }
     })
     $NewComputerTabPage.Controls.Add($OverrideCheckBox)
@@ -1237,9 +1526,6 @@ process {
     $SaveSourceTextBox.Location = New-Object System.Drawing.Size(5, 20) 
     $SaveSourceTextBox.Size = New-Object System.Drawing.Size(210, 20)
     $SaveSourceGroupBox.Controls.Add($SaveSourceTextBox)
-
-    # Set the old computer name
-    $OldComputerNameTextBox_NewPage.Text = Get-SaveState
 
     # Change save destination button
     $ChangeSaveSourceButton = New-Object System.Windows.Forms.Button
@@ -1263,6 +1549,16 @@ process {
         $OldComputerNameTextBox_NewPage.Text = Get-SaveState
     })
     $SaveSourceGroupBox.Controls.Add($ResetSaveSourceButton)
+    
+    # Populate old user data if DomainMigration.txt file exists, otherwise disable group box
+    if (Test-Path "$MigrationStorePath\$($OldComputerNameTextBox_NewPage.Text)\DomainMigration.txt") {
+        $OldUser = Get-Content "$MigrationStorePath\$($OldComputerNameTextBox_NewPage.Text)\DomainMigration.txt"
+        $OldDomainTextBox.Text = $OldUser.Split('\')[0]
+        $OldUserNameTextBox.Text = $OldUser.Split('\')[1]
+    } else {
+        $CrossDomainMigrationGroupBox.Enabled = $false
+        $CrossDomainMigrationGroupBox.Hide()
+    }
 
     # Migrate button
     $MigrateButton_NewPage = New-Object System.Windows.Forms.Button
@@ -1273,8 +1569,161 @@ process {
     $MigrateButton_NewPage.Add_Click({ Load-UserState })
     $NewComputerTabPage.Controls.Add($MigrateButton_NewPage)
 
+    # Create email settings tab
+    $EmailSettingsTabPage = New-Object System.Windows.Forms.TabPage
+    $EmailSettingsTabPage.DataBindings.DefaultDataSourceUpdateMode = 0
+    $EmailSettingsTabPage.UseVisualStyleBackColor = $true
+    $EmailSettingsTabPage.Text = 'Email Settings'
+    $TabControl.Controls.Add($EmailSettingsTabPage)
+
+    # Email enabled check box
+    $EmailCheckBox = New-Object System.Windows.Forms.CheckBox
+    $EmailCheckBox.Text = 'Enabled'
+    $EmailCheckBox.Location = New-Object System.Drawing.Size(10, 10) 
+    $EmailCheckBox.Size = New-Object System.Drawing.Size(300, 30)
+    $EmailCheckBox.Checked = $DefaultEmailEnabled
+    $EmailCheckBox.Add_Click({
+        if ($EmailCheckBox.Checked -eq $true) {
+            Update-Log 'Email enabled' -Color 'Yellow' -NoNewLine
+            Update-Log ' - Results will be emailed to supplied email addresses (if your account has email relay access).'
+        } else {
+            Update-Log 'Email disabled' -Color 'Yellow' -NoNewLine
+            Update-Log ' - No results will be emailed.'
+        }
+    })
+    $EmailSettingsTabPage.Controls.Add($EmailCheckBox)
+
+    # SMTP server group box
+    $SMTPServerGroupBox = New-Object System.Windows.Forms.GroupBox
+    $SMTPServerGroupBox.Location = New-Object System.Drawing.Size(10, 60)
+    $SMTPServerGroupBox.Size = New-Object System.Drawing.Size(220, 80)
+    $SMTPServerGroupBox.Text = 'SMTP Server'
+    $EmailSettingsTabPage.Controls.Add($SMTPServerGroupBox)
+
+    # SMTP server text box
+    $SMTPServerTextBox = New-Object System.Windows.Forms.TextBox
+    $SMTPServerTextBox.Location = New-Object System.Drawing.Size(10, 20) 
+    $SMTPServerTextBox.Size = New-Object System.Drawing.Size(200, 25)
+    $SMTPServerTextBox.Text = $DefaultSMTPServer
+    $SMTPServerGroupBox.Controls.Add($SMTPServerTextBox)
+
+    # Button to test connection to SMTP server
+    $SMTPConnectionButton = New-Object System.Windows.Forms.Button
+    $SMTPConnectionButton.Location = New-Object System.Drawing.Size(9, 50)
+    $SMTPConnectionButton.Size = New-Object System.Drawing.Size(100, 22)
+    $SMTPConnectionButton.Text = 'Test Connection'
+    $SMTPConnectionButton.Add_Click({
+        Update-Log "Testing connection to [$($SMTPServerTextBox.Text)]..." -NoNewLine
+        if (Test-Connection $SMTPServerTextBox.Text -Quiet) {
+            Update-Log "reachable."
+            $SMTPConnectionCheckBox.Checked = $true
+        } else {
+            Update-Log "unreachable." -Color 'Yellow'
+            $SMTPConnectionCheckBox.Checked = $false
+        }
+    })
+    $SMTPServerGroupBox.Controls.Add($SMTPConnectionButton)
+
+    # SMTP server reachable check box
+    $SMTPConnectionCheckBox = New-Object System.Windows.Forms.CheckBox
+    $SMTPConnectionCheckBox.Enabled = $false
+    $SMTPConnectionCheckBox.Text = 'Reachable'
+    $SMTPConnectionCheckBox.Location = New-Object System.Drawing.Size(135, 50) 
+    $SMTPConnectionCheckBox.Size = New-Object System.Drawing.Size(100, 20)
+    $SMTPServerGroupBox.Controls.Add($SMTPConnectionCheckBox)
+
+    # If email is enabled, check if SMTP server is reachable
+    if ($DefaultEmailEnabled -and -not (Test-Connection -ComputerName $SMTPServerTextBox.Text -Quiet)) {
+        Update-Log "Email disabled because SMTP server [$($SMTPServerTextBox.Text)] is unreachable." -Color 'Yellow'
+        $SMTPConnectionCheckBox.Checked = $false
+    } elseif ($DefaultEmailEnabled -and (Test-Connection -ComputerName $SMTPServerTextBox.Text -Quiet)) {
+        Update-Log "SMTP server [$($SMTPServerTextBox.Text)] is reachable."
+        $SMTPConnectionCheckBox.Checked = $true
+    }
+
+    # Email sender group box
+    $EmailSenderGroupBox = New-Object System.Windows.Forms.GroupBox
+    $EmailSenderGroupBox.Location = New-Object System.Drawing.Size(10, 150)
+    $EmailSenderGroupBox.Size = New-Object System.Drawing.Size(220, 50)
+    $EmailSenderGroupBox.Text = 'Email Sender'
+    $EmailSettingsTabPage.Controls.Add($EmailSenderGroupBox)
+
+    # Email sender text box
+    $EmailSenderTextBox = New-Object System.Windows.Forms.TextBox
+    $EmailSenderTextBox.Location = New-Object System.Drawing.Size(10, 20) 
+    $EmailSenderTextBox.Size = New-Object System.Drawing.Size(200, 25)
+    $EmailSenderTextBox.Text = $DefaultEmailSender
+    $EmailSenderGroupBox.Controls.Add($EmailSenderTextBox)
+
+    # Email recipients selection group box
+    $EmailRecipientsGroupBox = New-Object System.Windows.Forms.GroupBox
+    $EmailRecipientsGroupBox.Location = New-Object System.Drawing.Size(10, 230)
+    $EmailRecipientsGroupBox.Size = New-Object System.Drawing.Size(320, 230)
+    $EmailRecipientsGroupBox.Text = 'Email Recipients'
+    $EmailSettingsTabPage.Controls.Add($EmailRecipientsGroupBox)
+    
+    # Email recipients data table
+    $EmailRecipientsDataGridView = New-Object System.Windows.Forms.DataGridView
+    $EmailRecipientsDataGridView.Location = New-Object System.Drawing.Size(5, 20)
+    $EmailRecipientsDataGridView.Size = New-Object System.Drawing.Size(310, 170)
+    $EmailRecipientsDataGridView.ReadOnly = $true
+    $EmailRecipientsDataGridView.AllowUserToAddRows = $false
+    $EmailRecipientsDataGridView.AllowUserToResizeRows = $false
+    $EmailRecipientsDataGridView.AllowUserToResizeColumns = $false
+    $EmailRecipientsDataGridView.MultiSelect = $false
+    $EmailRecipientsDataGridView.ColumnCount = 1
+    $EmailRecipientsDataGridView.AutoSizeColumnsMode = 'Fill'
+    $EmailRecipientsDataGridView.ColumnHeadersVisible = $false
+    $EmailRecipientsDataGridView.RowHeadersVisible = $false
+    $EmailRecipientsGroupBox.Controls.Add($EmailRecipientsDataGridView)
+
+    # Add default email addresses to data grid view
+    foreach ($Email in $DefaultEmailRecipients) { $EmailRecipientsDataGridView.Rows.Add($Email) }
+
+    # Remove email recipient button
+    $RemoveEmailRecipientButton = New-Object System.Windows.Forms.Button
+    $RemoveEmailRecipientButton.Location = New-Object System.Drawing.Size(0, 150)
+    $RemoveEmailRecipientButton.Size = New-Object System.Drawing.Size(20, 20)
+    $RemoveEmailRecipientButton.Text = '-'
+    $RemoveEmailRecipientButton.Font = 'Consolas, 14'
+    $RemoveEmailRecipientButton.Add_Click({
+        # Remove selected cell from Email Recipients data grid view
+        $CurrentCell = $EmailRecipientsDataGridView.CurrentCell
+        Update-Log "Removed [$($CurrentCell.Value)] from email recipients."
+        $CurrentRow = $EmailRecipientsDataGridView.Rows[$CurrentCell.RowIndex]
+        $EmailRecipientsDataGridView.Rows.Remove($CurrentRow)
+    })
+    $EmailRecipientsDataGridView.Controls.Add($RemoveEmailRecipientButton)
+
+    # Add email recipient button
+    $AddEmailRecipientButton = New-Object System.Windows.Forms.Button
+    $AddEmailRecipientButton.Location = New-Object System.Drawing.Size(20, 150)
+    $AddEmailRecipientButton.Size = New-Object System.Drawing.Size(20, 20)
+    $AddEmailRecipientButton.Text = '+'
+    $AddEmailRecipientButton.Font = 'Consolas, 14'
+    $AddEmailRecipientButton.Add_Click({
+        Update-Log "Adding to email recipients: $($EmailRecipientToAddTextBox.Text)."
+        $EmailRecipientsDataGridView.Rows.Add($EmailRecipientToAddTextBox.Text)
+    })
+    $EmailRecipientsDataGridView.Controls.Add($AddEmailRecipientButton)
+
+    # Email recipient to add text box
+    $EmailRecipientToAddTextBox = New-Object System.Windows.Forms.TextBox
+    $EmailRecipientToAddTextBox.Location = New-Object System.Drawing.Size(5, 200) 
+    $EmailRecipientToAddTextBox.Size = New-Object System.Drawing.Size(200, 25)
+    $EmailRecipientToAddTextBox.Text = 'Recipient@To.Add'
+    $EmailRecipientsGroupBox.Controls.Add($EmailRecipientToAddTextBox)
+
     # Test if user is using an admin account
     Test-UserAdmin
+
+    # Test the version of PowerShell and disable incompatible features
+    if ($PSVersionTable.PSVersion.Major -lt 3) {
+        Update-Log "You are running a version of PowerShell less than 3.0 - some features have been disabled."
+        $ChangeSaveDestinationButton.Enabled = $false
+        $ChangeSaveSourceButton.Enabled = $false
+        $AddExtraDirectoryButton.Enabled = $false
+    }
 
     # Get the path to the USMT files
     Get-USMT
