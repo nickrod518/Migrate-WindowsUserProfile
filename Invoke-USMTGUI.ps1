@@ -435,7 +435,9 @@ $WallpapersXML
 			Update-Log "Using [$USMTPath] as path to USMT binaries."
         } else {
             Update-Log "Unable to reach USMT binaries. Verify [$USMTPath] exists and restart script.`n" -Color 'Red'
-            $TabControl.Enabled = $false
+            $MigrateButton_OldPage.Enabled = $false
+            $MigrateButton_NewPage.Enabled = $false
+            #$TabControl.Enabled = $false
         }
     }
 
@@ -521,6 +523,18 @@ $WallpapersXML
         }
 
         $OldComputer
+    }
+
+    function Show-DomainInfo {
+        # Populate old user data if DomainMigration.txt file exists, otherwise disable group box
+        if (Test-Path "$MigrationStorePath\$($OldComputerNameTextBox_NewPage.Text)\DomainMigration.txt") {
+            $OldUser = Get-Content "$MigrationStorePath\$($OldComputerNameTextBox_NewPage.Text)\DomainMigration.txt"
+            $OldDomainTextBox.Text = $OldUser.Split('\')[0]
+            $OldUserNameTextBox.Text = $OldUser.Split('\')[1]
+        } else {
+            $CrossDomainMigrationGroupBox.Enabled = $false
+            $CrossDomainMigrationGroupBox.Hide()
+        }
     }
 
     function Save-UserState {
@@ -825,13 +839,48 @@ $WallpapersXML
         Update-Log "               / \   ___ ___(_)___| |_ __ _ _ __ | |_   " -Color 'LightBlue'
         Update-Log "              / _ \ / __/ __| / __| __/ _`` | '_ \| __|  " -Color 'LightBlue'
         Update-Log "             / ___ \\__ \__ \ \__ \ || (_| | | | | |_   " -Color 'LightBlue'
-        Update-Log "            /_/   \_\___/___/_|___/\__\__,_|_| |_|\__| v2.0" -Color 'LightBlue'
+        Update-Log "            /_/   \_\___/___/_|___/\__\__,_|_| |_|\__| v2.3" -Color 'LightBlue'
         Update-Log
         Update-Log '                        by Nick Rodriguez' -Color 'Gold'
         Update-Log
     }
 
     function Test-IsISE { if ($psISE) { $true } else { $false } }
+
+    function Test-PSVersion {
+        if ($PSVersionTable.PSVersion.Major -lt 3) {
+            Update-Log "You are running a version of PowerShell less than 3.0 - some features have been disabled."
+            $ChangeSaveDestinationButton.Enabled = $false
+            $ChangeSaveSourceButton.Enabled = $false
+            $AddExtraDirectoryButton.Enabled = $false
+        }
+    }
+
+    function Test-Email {
+        $EmailSubject = "Migration Assistant Email Test"
+        if ($SMTPConnectionCheckBox.Checked -or (Test-Connection -ComputerName $SMTPServerTextBox.Text -Quiet)) {
+            $SMTPConnectionCheckBox.Checked = $true
+
+            $EmailRecipients = @()
+
+            $EmailRecipientsDataGridView.Rows | ForEach-Object {
+                $CurrentRowIndex = $_.Index
+                $EmailRecipients += $EmailRecipientsDataGridView.Item(0, $CurrentRowIndex).Value
+            }
+
+            Update-Log "Sending test email to: $EmailRecipients"
+
+            try {
+                Send-MailMessage -From $EmailSenderTextBox.Text -To $EmailRecipients `
+                    -Subject $EmailSubject -Body $LogTextBox.Text -SmtpServer $SMTPServerTextBox.Text `
+                    -ErrorAction Stop
+            } catch {
+                Update-Log "Error occurred sending email: $($_.Exception.Message)" -Color 'Red'
+            }
+        } else {
+            Update-Log "Unable to send email of results because SMTP server [$($SMTPServerTextBox.Text)] is unreachable." -Color 'Yellow'
+        }
+    }
 
     # Hide parent PowerShell window unless run from ISE
     if (-not $(Test-IsISE)) {
@@ -1331,6 +1380,56 @@ process {
     $NewComputerInfoGroupBox.Text = 'Computer Info'
     $NewComputerTabPage.Controls.Add($NewComputerInfoGroupBox)
     
+    # Alternative save location group box
+    $SaveSourceGroupBox = New-Object System.Windows.Forms.GroupBox
+    $SaveSourceGroupBox.Location = New-Object System.Drawing.Size(240, 110)
+    $SaveSourceGroupBox.Size = New-Object System.Drawing.Size(220, 87)
+    $SaveSourceGroupBox.Text = 'Save State Source'
+    $NewComputerTabPage.Controls.Add($SaveSourceGroupBox)
+
+    # Save path
+    $SaveSourceTextBox = New-Object System.Windows.Forms.TextBox
+    $SaveSourceTextBox.Text = $MigrationStorePath
+    $SaveSourceTextBox.Location = New-Object System.Drawing.Size(5, 20) 
+    $SaveSourceTextBox.Size = New-Object System.Drawing.Size(210, 20)
+    $SaveSourceGroupBox.Controls.Add($SaveSourceTextBox)
+
+    # Change save destination button
+    $ChangeSaveSourceButton = New-Object System.Windows.Forms.Button
+    $ChangeSaveSourceButton.Location = New-Object System.Drawing.Size(5, 50)
+    $ChangeSaveSourceButton.Size = New-Object System.Drawing.Size(60, 20)
+    $ChangeSaveSourceButton.Text = 'Change'
+    $ChangeSaveSourceButton.Add_Click({ 
+        Set-SaveDirectory -Type Source
+        $OldComputerNameTextBox_NewPage.Text = Get-SaveState
+        Show-DomainInfo
+    })
+    $SaveSourceGroupBox.Controls.Add($ChangeSaveSourceButton)
+
+    # Reset save destination button
+    $ResetSaveSourceButton = New-Object System.Windows.Forms.Button
+    $ResetSaveSourceButton.Location = New-Object System.Drawing.Size(75, 50)
+    $ResetSaveSourceButton.Size = New-Object System.Drawing.Size(65, 20)
+    $ResetSaveSourceButton.Text = 'Reset'
+    $ResetSaveSourceButton.Add_Click({
+        Update-Log "Resetting save state directory to [$MigrationStorePath]."
+        $SaveSourceTextBox.Text = $MigrationStorePath
+        $OldComputerNameTextBox_NewPage.Text = Get-SaveState
+        Show-DomainInfo
+    })
+    $SaveSourceGroupBox.Controls.Add($ResetSaveSourceButton)
+
+    # Search for save state in given SaveSourceTextBox path
+    $ResetSaveSourceButton = New-Object System.Windows.Forms.Button
+    $ResetSaveSourceButton.Location = New-Object System.Drawing.Size(150, 50)
+    $ResetSaveSourceButton.Size = New-Object System.Drawing.Size(65, 20)
+    $ResetSaveSourceButton.Text = 'Search'
+    $ResetSaveSourceButton.Add_Click({
+        $OldComputerNameTextBox_NewPage.Text = Get-SaveState
+        Show-DomainInfo
+    })
+    $SaveSourceGroupBox.Controls.Add($ResetSaveSourceButton)
+    
     # Name label
     $ComputerNameLabel_NewPage = New-Object System.Windows.Forms.Label
     $ComputerNameLabel_NewPage.Location = New-Object System.Drawing.Size(100, 12)
@@ -1513,52 +1612,7 @@ process {
     })
     $NewComputerTabPage.Controls.Add($OverrideCheckBox)
 
-    # Alternative save location group box
-    $SaveSourceGroupBox = New-Object System.Windows.Forms.GroupBox
-    $SaveSourceGroupBox.Location = New-Object System.Drawing.Size(240, 110)
-    $SaveSourceGroupBox.Size = New-Object System.Drawing.Size(220, 87)
-    $SaveSourceGroupBox.Text = 'Save State Source'
-    $NewComputerTabPage.Controls.Add($SaveSourceGroupBox)
-
-    # Save path
-    $SaveSourceTextBox = New-Object System.Windows.Forms.TextBox
-    $SaveSourceTextBox.Text = $MigrationStorePath
-    $SaveSourceTextBox.Location = New-Object System.Drawing.Size(5, 20) 
-    $SaveSourceTextBox.Size = New-Object System.Drawing.Size(210, 20)
-    $SaveSourceGroupBox.Controls.Add($SaveSourceTextBox)
-
-    # Change save destination button
-    $ChangeSaveSourceButton = New-Object System.Windows.Forms.Button
-    $ChangeSaveSourceButton.Location = New-Object System.Drawing.Size(35, 50)
-    $ChangeSaveSourceButton.Size = New-Object System.Drawing.Size(60, 20)
-    $ChangeSaveSourceButton.Text = 'Change'
-    $ChangeSaveSourceButton.Add_Click({ 
-        Set-SaveDirectory -Type Source
-        $OldComputerNameTextBox_NewPage.Text = Get-SaveState
-    })
-    $SaveSourceGroupBox.Controls.Add($ChangeSaveSourceButton)
-
-    # Reset save destination button
-    $ResetSaveSourceButton = New-Object System.Windows.Forms.Button
-    $ResetSaveSourceButton.Location = New-Object System.Drawing.Size(120, 50)
-    $ResetSaveSourceButton.Size = New-Object System.Drawing.Size(65, 20)
-    $ResetSaveSourceButton.Text = 'Reset'
-    $ResetSaveSourceButton.Add_Click({
-        Update-Log "Resetting save state directory to [$MigrationStorePath]."
-        $SaveSourceTextBox.Text = $MigrationStorePath
-        $OldComputerNameTextBox_NewPage.Text = Get-SaveState
-    })
-    $SaveSourceGroupBox.Controls.Add($ResetSaveSourceButton)
-    
-    # Populate old user data if DomainMigration.txt file exists, otherwise disable group box
-    if (Test-Path "$MigrationStorePath\$($OldComputerNameTextBox_NewPage.Text)\DomainMigration.txt") {
-        $OldUser = Get-Content "$MigrationStorePath\$($OldComputerNameTextBox_NewPage.Text)\DomainMigration.txt"
-        $OldDomainTextBox.Text = $OldUser.Split('\')[0]
-        $OldUserNameTextBox.Text = $OldUser.Split('\')[1]
-    } else {
-        $CrossDomainMigrationGroupBox.Enabled = $false
-        $CrossDomainMigrationGroupBox.Hide()
-    }
+    Show-DomainInfo
 
     # Migrate button
     $MigrateButton_NewPage = New-Object System.Windows.Forms.Button
@@ -1658,14 +1712,14 @@ process {
     # Email recipients selection group box
     $EmailRecipientsGroupBox = New-Object System.Windows.Forms.GroupBox
     $EmailRecipientsGroupBox.Location = New-Object System.Drawing.Size(10, 230)
-    $EmailRecipientsGroupBox.Size = New-Object System.Drawing.Size(320, 230)
+    $EmailRecipientsGroupBox.Size = New-Object System.Drawing.Size(220, 230)
     $EmailRecipientsGroupBox.Text = 'Email Recipients'
     $EmailSettingsTabPage.Controls.Add($EmailRecipientsGroupBox)
     
     # Email recipients data table
     $EmailRecipientsDataGridView = New-Object System.Windows.Forms.DataGridView
     $EmailRecipientsDataGridView.Location = New-Object System.Drawing.Size(5, 20)
-    $EmailRecipientsDataGridView.Size = New-Object System.Drawing.Size(310, 170)
+    $EmailRecipientsDataGridView.Size = New-Object System.Drawing.Size(210, 170)
     $EmailRecipientsDataGridView.ReadOnly = $true
     $EmailRecipientsDataGridView.AllowUserToAddRows = $false
     $EmailRecipientsDataGridView.AllowUserToResizeRows = $false
@@ -1714,16 +1768,20 @@ process {
     $EmailRecipientToAddTextBox.Text = 'Recipient@To.Add'
     $EmailRecipientsGroupBox.Controls.Add($EmailRecipientToAddTextBox)
 
+    # Send test email button
+    $TestEmailButton = New-Object System.Windows.Forms.Button
+    $TestEmailButton.Location = New-Object System.Drawing.Size(300, 400)
+    $TestEmailButton.Size = New-Object System.Drawing.Size(100, 40)
+    $TestEmailButton.Font = New-Object System.Drawing.Font('Calibri', 14, [System.Drawing.FontStyle]::Bold)
+    $TestEmailButton.Text = 'Test Email'
+    $TestEmailButton.Add_Click({ Test-Email })
+    $EmailSettingsTabPage.Controls.Add($TestEmailButton)
+
     # Test if user is using an admin account
     Test-UserAdmin
 
     # Test the version of PowerShell and disable incompatible features
-    if ($PSVersionTable.PSVersion.Major -lt 3) {
-        Update-Log "You are running a version of PowerShell less than 3.0 - some features have been disabled."
-        $ChangeSaveDestinationButton.Enabled = $false
-        $ChangeSaveSourceButton.Enabled = $false
-        $AddExtraDirectoryButton.Enabled = $false
-    }
+    Test-PSVersion
 
     # Get the path to the USMT files
     Get-USMT
