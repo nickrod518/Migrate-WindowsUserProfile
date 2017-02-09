@@ -82,19 +82,51 @@ begin {
     # Get the user's name that ran this script
     function Get-CurrentUserName { $env:USERNAME }
 
+    function Get-UserProfileLastLogin {
+        param(
+            [string]$Domain,
+            [string]$UserName
+        )
+
+        $CurrentUser = try { ([ADSI]"WinNT://$Domain/$UserName") } catch { }
+        if ($CurrentUser.Properties.LastLogin) {
+            try {
+                [datetime](-join $CurrentUser.Properties.LastLogin)
+            } catch {
+                -join $CurrentUser.Properties.LastLogin
+            }
+        } elseif ($CurrentUser.Properties.Name) {
+        } else {
+            'N/A'
+        }
+    }
+
     function Get-UserProfiles {
-        # Get all user profiles on this PC and let the user select one to migrate
+        # Get all user profiles on this PC and let the user select which ones to migrate
         $RegKey = 'Registry::HKey_Local_Machine\Software\Microsoft\Windows NT\CurrentVersion\ProfileList\*'
 
         # Return each profile on this computer
         Get-ItemProperty -Path $RegKey | ForEach-Object {
             try {
                 $SID = New-object System.Security.Principal.SecurityIdentifier($_.PSChildName)
-                try { 
+                try {
+
                     $User = $SID.Translate([System.Security.Principal.NTAccount]).Value
-                    # Don't show NT Authority or local accounts
-                    if (($User -notlike 'NT Authority\*') -and ($User -notlike "$(Get-HostName)\*")) {
-                        $ProfileComboBox.Items.Add($User) | Out-Null
+
+                    # Don't show NT Authority accounts
+                    if ($User -notlike 'NT Authority\*') {
+                        $Domain = $User.Split('\')[0]
+                        $UserName = $User.Split('\')[1]
+                        $LastLogin = Get-UserProfileLastLogin -Domain $Domain -UserName $UserName
+                        $ProfilePath = Get-UserProfilePath -Domain $Domain -UserName $UserName
+
+                        $UserObject = New-Object psobject
+                        $UserObject | Add-Member -MemberType NoteProperty -Name Domain -Value $Domain
+                        $UserObject | Add-Member -MemberType NoteProperty -Name UserName -Value $UserName
+                        $UserObject | Add-Member -MemberType NoteProperty -Name LastLogin -Value $LastLogin
+                        $UserObject | Add-Member -MemberType NoteProperty -Name ProfilePath -Value $ProfilePath
+
+                        $UserObject
                     }
                 } catch {
                     Update-Log "Error while translating $SID to a user name." -Color 'Yellow'
@@ -106,9 +138,12 @@ begin {
     }
 
     function Get-UserProfilePath {
-        $SelectedUserDomain = $ProfileComboBox.Text.Split('\', 2)[0]
-        $SelectedUserName = $ProfileComboBox.Text.Split('\', 2)[1]
-        $UserObject = New-Object System.Security.Principal.NTAccount($SelectedUserDomain, $SelectedUserName) 
+        param(
+            [string]$Domain,
+            [string]$UserName
+        )
+
+        $UserObject = New-Object System.Security.Principal.NTAccount($Domain, $UserName) 
         $SID = $UserObject.Translate([System.Security.Principal.SecurityIdentifier])
         $User = Get-ItemProperty -Path "Registry::HKey_Local_Machine\Software\Microsoft\Windows NT\CurrentVersion\ProfileList\$($SID.Value)"
         $User.ProfileImagePath
@@ -437,7 +472,6 @@ $WallpapersXML
             Update-Log "Unable to reach USMT binaries. Verify [$USMTPath] exists and restart script.`n" -Color 'Red'
             $MigrateButton_OldPage.Enabled = $false
             $MigrateButton_NewPage.Enabled = $false
-            #$TabControl.Enabled = $false
         }
     }
 
@@ -566,10 +600,10 @@ $WallpapersXML
         if ($ConnectionCheckBox_OldPage.Checked -or (-not $SaveRemotelyCheckBox.Checked)) {
             Update-Log 'Connection verified, proceeding with migration...'
 
-            # Get the user profile to save
-            if ($ProfileComboBox.Text) {
-                $User = $ProfileComboBox.Text
-                Update-Log "$User's profile has been selected for save state."
+            # Get the selected profiles
+            if ($Script:SelectedProfile) {
+                Update-Log "Profile(s) selected for save state:"
+                $Script:SelectedProfile | ForEach-Object { Update-Log $_.UserName }
             } else {
                 Update-Log "You must select a user profile." -Color 'Red'
                 return
@@ -599,9 +633,9 @@ $WallpapersXML
             }
 
             # If profile is a domain other than $DefaultDomain, save this info to text file
-            $Domain = $User.Split('\')[0]
-            if ($Domain -ne $DefaultDomain) {
-                New-Item "$Destination\DomainMigration.txt" -ItemType File -Value $User | Out-Null
+            $FullUserName = "$($Script:SelectedProfile.Domain)\$($Script:SelectedProfile.UserName)"
+            if ($Script:SelectedProfile.Domain -ne $DefaultDomain) {
+                New-Item "$Destination\DomainMigration.txt" -ItemType File -Value $FullUserName | Out-Null
                 Update-Log "Text file created with cross-domain information."
             }
 
@@ -619,8 +653,9 @@ $WallpapersXML
                 $Uncompressed = ''
             }
 
-            # Overwrite existing save state, use volume shadow copy method, exclude all but the selected user
-            $Arguments = "`"$Destination`" `"/i:$Config`" /o /vsc /ue:*\* `"/ui:$User`" $Uncompressed $Logs"
+            # Overwrite existing save state, use volume shadow copy method, exclude all but the selected user(s)
+            $UsersToInclude += $Script:SelectedProfile | ForEach-Object { "`"/ui:$($_.Domain)\$($_.UserName)`"" }
+            $Arguments = "`"$Destination`" `"/i:$Config`" /o /vsc /ue:* $UsersToInclude $Uncompressed $Logs"
 
             # Begin saving user state to new computer
             Update-Log "Command used:"
@@ -629,7 +664,7 @@ $WallpapersXML
             # If we're running in debug mode don't actually start the process
             if ($Debug) { return }
 
-            Update-Log "Saving state of $User to $Destination..." -NoNewLine
+            Update-Log "Saving state of $OldComputer to $Destination..." -NoNewLine
             Start-Process -FilePath $ScanState -ArgumentList $Arguments -Verb RunAs
 
             # Give the process time to start before checking for its existence
@@ -855,7 +890,7 @@ $WallpapersXML
         Update-Log "               / \   ___ ___(_)___| |_ __ _ _ __ | |_   " -Color 'LightBlue'
         Update-Log "              / _ \ / __/ __| / __| __/ _`` | '_ \| __|  " -Color 'LightBlue'
         Update-Log "             / ___ \\__ \__ \ \__ \ || (_| | | | | |_   " -Color 'LightBlue'
-        Update-Log "            /_/   \_\___/___/_|___/\__\__,_|_| |_|\__| v2.4" -Color 'LightBlue'
+        Update-Log "            /_/   \_\___/___/_|___/\__\__,_|_| |_|\__| v2.5" -Color 'LightBlue'
         Update-Log
         Update-Log '                        by Nick Rodriguez' -Color 'Gold'
         Update-Log
@@ -1058,29 +1093,23 @@ process {
     # Profile selection group box
     $ProfileSelectionGroupBox = New-Object System.Windows.Forms.GroupBox
     $ProfileSelectionGroupBox.Location = New-Object System.Drawing.Size(240, 225)
-    $ProfileSelectionGroupBox.Size = New-Object System.Drawing.Size(220, 60)
+    $ProfileSelectionGroupBox.Size = New-Object System.Drawing.Size(220, 50)
     $ProfileSelectionGroupBox.Text = 'Profile to Migrate'
     $OldComputerTabPage.Controls.Add($ProfileSelectionGroupBox)
 
-    # Selected Profile combo box
-    $ProfileComboBox = New-Object System.Windows.Forms.ComboBox
-    $ProfileComboBox.Location = New-Object System.Drawing.Size(5, 30) 
-    $ProfileComboBox.Size = New-Object System.Drawing.Size(210, 20)
-    $ProfileComboBox.DropDownStyle = 'DropDownList'
-    Get-UserProfiles
-    $ProfileComboBox.Add_SelectionChangeCommitted({
-        # Get the selected profile
-        $SelectedProfile = $ProfileComboBox.Text
-        $UserProfilePath = Get-UserProfilePath
-        Update-Log "Selected profile set to $SelectedProfile [$UserProfilePath]."
-
-        # If domain is not $Domain, let user know cross-domain migration will take place
-        $Domain = $SelectedProfile.Split('\')[0]
-        if ($Domain -ne $DefaultDomain) {
-            Update-Log "Selected profile is coming from $Domain domain. This will be noted in save state data and used during load state for cross-domain profile migration."
-        }
+    # Select profile(s) button
+    $SelectProfileButton = New-Object System.Windows.Forms.Button
+    $SelectProfileButton.Location = New-Object System.Drawing.Size(50, 15)
+    $SelectProfileButton.Size = New-Object System.Drawing.Size(120, 20)
+    $SelectProfileButton.Text = 'Profile(s) to Migrate'
+    $SelectProfileButton.Add_Click({
+        Update-Log "Please wait while profiles are found..."
+        $Script:SelectedProfile = Get-UserProfiles | 
+            Out-GridView -Title 'Profile Selection' -OutputMode Multiple
+        Update-Log "Profile(s) selected for migration:"
+        $Script:SelectedProfile | ForEach-Object { Update-Log $_.UserName }
     })
-    $ProfileSelectionGroupBox.Controls.Add($ProfileComboBox)
+    $ProfileSelectionGroupBox.Controls.Add($SelectProfileButton)
 
     # Alternative save location group box
     $SaveDestinationGroupBox = New-Object System.Windows.Forms.GroupBox
@@ -1360,7 +1389,7 @@ process {
     # Uncompressed storage check box
     $UncompressedCheckBox = New-Object System.Windows.Forms.CheckBox
     $UncompressedCheckBox.Text = 'Uncompressed storage'
-    $UncompressedCheckBox.Location = New-Object System.Drawing.Size(280, 300) 
+    $UncompressedCheckBox.Location = New-Object System.Drawing.Size(280, 350) 
     $UncompressedCheckBox.Size = New-Object System.Drawing.Size(300, 30)
     $UncompressedCheckBox.Add_Click({
         if ($UncompressedCheckBox.Checked -eq $true) {
@@ -1672,8 +1701,8 @@ process {
 
     # SMTP server text box
     $SMTPServerTextBox = New-Object System.Windows.Forms.TextBox
-    $SMTPServerTextBox.Location = New-Object System.Drawing.Size(10, 20) 
-    $SMTPServerTextBox.Size = New-Object System.Drawing.Size(200, 25)
+    $SMTPServerTextBox.Location = New-Object System.Drawing.Size(5, 20) 
+    $SMTPServerTextBox.Size = New-Object System.Drawing.Size(210, 25)
     $SMTPServerTextBox.Text = $DefaultSMTPServer
     $SMTPServerGroupBox.Controls.Add($SMTPServerTextBox)
 
@@ -1720,8 +1749,8 @@ process {
 
     # Email sender text box
     $EmailSenderTextBox = New-Object System.Windows.Forms.TextBox
-    $EmailSenderTextBox.Location = New-Object System.Drawing.Size(10, 20) 
-    $EmailSenderTextBox.Size = New-Object System.Drawing.Size(200, 25)
+    $EmailSenderTextBox.Location = New-Object System.Drawing.Size(5, 20) 
+    $EmailSenderTextBox.Size = New-Object System.Drawing.Size(210, 25)
     $EmailSenderTextBox.Text = $DefaultEmailSender
     $EmailSenderGroupBox.Controls.Add($EmailSenderTextBox)
 
@@ -1780,7 +1809,7 @@ process {
     # Email recipient to add text box
     $EmailRecipientToAddTextBox = New-Object System.Windows.Forms.TextBox
     $EmailRecipientToAddTextBox.Location = New-Object System.Drawing.Size(5, 200) 
-    $EmailRecipientToAddTextBox.Size = New-Object System.Drawing.Size(200, 25)
+    $EmailRecipientToAddTextBox.Size = New-Object System.Drawing.Size(210, 25)
     $EmailRecipientToAddTextBox.Text = 'Recipient@To.Add'
     $EmailRecipientsGroupBox.Controls.Add($EmailRecipientToAddTextBox)
 
