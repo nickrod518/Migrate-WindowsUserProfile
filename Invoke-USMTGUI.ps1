@@ -605,7 +605,9 @@ $WallpapersXML
             Update-Log 'Connection verified, proceeding with migration...'
 
             # Get the selected profiles
-            if ($Script:SelectedProfile) {
+            if ($RecentProfilesCheckBox.Checked -eq $true) {
+                Update-Log "All profiles logged into within the last $($RecentProfilesDaysTextBox.Text) days will be saved."
+            } elseif ($Script:SelectedProfile) {
                 Update-Log "Profile(s) selected for save state:"
                 $Script:SelectedProfile | ForEach-Object { Update-Log $_.UserName }
             } else {
@@ -657,9 +659,14 @@ $WallpapersXML
                 $Uncompressed = ''
             }
 
-            # Overwrite existing save state, use volume shadow copy method, exclude all but the selected user(s)
-            $UsersToInclude += $Script:SelectedProfile | ForEach-Object { "`"/ui:$($_.Domain)\$($_.UserName)`"" }
-            $Arguments = "`"$Destination`" `"/i:$Config`" /o /vsc /ue:* $UsersToInclude $Uncompressed $Logs"
+            # Overwrite existing save state, use volume shadow copy method, exclude all but the selected profile(s)
+            # Get the selected profiles
+            if ($RecentProfilesCheckBox.Checked -eq $true) {
+                $Arguments = "`"$Destination`" `"/i:$Config`" /o /vsc /ui:* /uel:$($RecentProfilesDaysTextBox.Text) $Uncompressed $Logs"
+            } else {
+                $UsersToInclude += $Script:SelectedProfile | ForEach-Object { "`"/ui:$($_.Domain)\$($_.UserName)`"" }
+                $Arguments = "`"$Destination`" `"/i:$Config`" /o /vsc /ue:* $UsersToInclude $Uncompressed $Logs"
+            }
 
             # Begin saving user state to new computer
             Update-Log "Command used:"
@@ -894,7 +901,7 @@ $WallpapersXML
         Update-Log "               / \   ___ ___(_)___| |_ __ _ _ __ | |_   " -Color 'LightBlue'
         Update-Log "              / _ \ / __/ __| / __| __/ _`` | '_ \| __|  " -Color 'LightBlue'
         Update-Log "             / ___ \\__ \__ \ \__ \ || (_| | | | | |_   " -Color 'LightBlue'
-        Update-Log "            /_/   \_\___/___/_|___/\__\__,_|_| |_|\__| v2.5" -Color 'LightBlue'
+        Update-Log "            /_/   \_\___/___/_|___/\__\__,_|_| |_|\__| v2.6" -Color 'LightBlue'
         Update-Log
         Update-Log '                        by Nick Rodriguez' -Color 'Gold'
         Update-Log
@@ -1094,9 +1101,16 @@ process {
     $ConnectionCheckBox_OldPage.Size = New-Object System.Drawing.Size(100, 20)
     $OldComputerInfoGroupBox.Controls.Add($ConnectionCheckBox_OldPage)
 
+    # Profile selection group box
+    $SelectProfileGroupBox = New-Object System.Windows.Forms.GroupBox
+    $SelectProfileGroupBox.Location = New-Object System.Drawing.Size(240, 220)
+    $SelectProfileGroupBox.Size = New-Object System.Drawing.Size(220, 100)
+    $SelectProfileGroupBox.Text = 'Save State Destination'
+    $OldComputerTabPage.Controls.Add($SelectProfileGroupBox)
+
     # Select profile(s) button
     $SelectProfileButton = New-Object System.Windows.Forms.Button
-    $SelectProfileButton.Location = New-Object System.Drawing.Size(270, 225)
+    $SelectProfileButton.Location = New-Object System.Drawing.Size(30, 20)
     $SelectProfileButton.Size = New-Object System.Drawing.Size(160, 20)
     $SelectProfileButton.Text = 'Select Profile(s) to Migrate'
     $SelectProfileButton.Add_Click({
@@ -1106,7 +1120,30 @@ process {
         Update-Log "Profile(s) selected for migration:"
         $Script:SelectedProfile | ForEach-Object { Update-Log $_.UserName }
     })
-    $OldComputerTabPage.Controls.Add($SelectProfileButton)
+    $SelectProfileGroupBox.Controls.Add($SelectProfileButton)
+
+    # Recent profile day limit text box
+    $RecentProfilesDaysTextBox = New-Object System.Windows.Forms.TextBox 
+    $RecentProfilesDaysTextBox.Location = New-Object System.Drawing.Size(165, 70) 
+    $RecentProfilesDaysTextBox.Size = New-Object System.Drawing.Size(40, 20)
+    $RecentProfilesDaysTextBox.Text = 90
+    $SelectProfileGroupBox.Controls.Add($RecentProfilesDaysTextBox)
+
+    # Only recent profiles check box
+    $RecentProfilesCheckBox = New-Object System.Windows.Forms.CheckBox
+    $RecentProfilesCheckBox.Text = 'Migrate all profiles logged into within this amount of days:'
+    $RecentProfilesCheckBox.Location = New-Object System.Drawing.Size(15, 50) 
+    $RecentProfilesCheckBox.Size = New-Object System.Drawing.Size(200, 40)
+    $RecentProfilesCheckBox.Add_Click({
+        if ($RecentProfilesCheckBox.Checked -eq $true) {
+            Update-Log "All profiles logged into within the last $($RecentProfilesDaysTextBox.Text) days will be saved."
+            $SelectProfileButton.Enabled = $false
+        } else {
+            Update-Log "Recent profile save disabled." -Color Yellow
+            $SelectProfileButton.Enabled = $true
+        }
+    })
+    $SelectProfileGroupBox.Controls.Add($RecentProfilesCheckBox)
 
     # Alternative save location group box
     $SaveDestinationGroupBox = New-Object System.Windows.Forms.GroupBox
