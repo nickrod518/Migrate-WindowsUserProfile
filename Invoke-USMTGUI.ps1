@@ -538,6 +538,10 @@ $WallpapersXML
     }
 
     function Save-UserState {
+        param(
+            [switch] $Debug
+        )
+
         Update-Log "`nBeginning migration..."
 
         # If we're saving locally, skip network stuff
@@ -621,6 +625,10 @@ $WallpapersXML
             # Begin saving user state to new computer
             Update-Log "Command used:"
             Update-Log "$ScanState $Arguments" -Color 'Cyan'
+
+            # If we're running in debug mode don't actually start the process
+            if ($Debug) { return }
+
             Update-Log "Saving state of $User to $Destination..." -NoNewLine
             Start-Process -FilePath $ScanState -ArgumentList $Arguments -Verb RunAs
 
@@ -645,6 +653,10 @@ $WallpapersXML
     }
 
     function Load-UserState {
+        param(
+            [switch] $Debug
+        )
+
         Update-Log "`nBeginning migration..."
 
         # If override is enabled, skip network checks
@@ -724,6 +736,10 @@ $WallpapersXML
         # Begin loading user state to this computer
         Update-Log "Command used:"
         Update-Log "$LoadState $Arguments" -Color 'Cyan'
+
+        # If we're running in debug mode don't actually start the process
+        if ($Debug) { return }
+
         Update-Log "Loading state of $OldComputer..." -NoNewLine
         Start-Process -FilePath $LoadState -ArgumentList $Arguments -Verb RunAs
 
@@ -839,7 +855,7 @@ $WallpapersXML
         Update-Log "               / \   ___ ___(_)___| |_ __ _ _ __ | |_   " -Color 'LightBlue'
         Update-Log "              / _ \ / __/ __| / __| __/ _`` | '_ \| __|  " -Color 'LightBlue'
         Update-Log "             / ___ \\__ \__ \ \__ \ || (_| | | | | |_   " -Color 'LightBlue'
-        Update-Log "            /_/   \_\___/___/_|___/\__\__,_|_| |_|\__| v2.3" -Color 'LightBlue'
+        Update-Log "            /_/   \_\___/___/_|___/\__\__,_|_| |_|\__| v2.4" -Color 'LightBlue'
         Update-Log
         Update-Log '                        by Nick Rodriguez' -Color 'Gold'
         Update-Log
@@ -1776,6 +1792,20 @@ process {
     $TestEmailButton.Text = 'Test Email'
     $TestEmailButton.Add_Click({ Test-Email })
     $EmailSettingsTabPage.Controls.Add($TestEmailButton)
+
+    # Debug button
+    $DebugLabel = New-Object System.Windows.Forms.Label
+    $DebugLabel.Location = New-Object System.Drawing.Size(980, 500)
+    $DebugLabel.Size = New-Object System.Drawing.Size(10, 15)
+    $DebugLabel.Text = '?'
+    $DebugLabel.Add_Click({
+        if ($TabControl.SelectedIndex -eq 0) {
+            Save-UserState -Debug
+        } elseif ($TabControl.SelectedIndex -eq 1) {
+            Load-UserState -Debug
+        }
+    })
+    $Form.Controls.Add($DebugLabel)
 
     # Test if user is using an admin account
     Test-UserAdmin
