@@ -117,7 +117,11 @@ begin {
                     if ($User -notlike 'NT Authority\*') {
                         $Domain = $User.Split('\')[0]
                         $UserName = $User.Split('\')[1]
-                        $LastLogin = Get-UserProfileLastLogin -Domain $Domain -UserName $UserName
+                        if ($Script:QueryLastLogon) {
+                            $LastLogin = Get-UserProfileLastLogin -Domain $Domain -UserName $UserName
+                        } else {
+                            $LastLogin = 'N/A'
+                        }
                         $ProfilePath = Get-UserProfilePath -Domain $Domain -UserName $UserName
 
                         $UserObject = New-Object psobject
@@ -1090,18 +1094,11 @@ process {
     $ConnectionCheckBox_OldPage.Size = New-Object System.Drawing.Size(100, 20)
     $OldComputerInfoGroupBox.Controls.Add($ConnectionCheckBox_OldPage)
 
-    # Profile selection group box
-    $ProfileSelectionGroupBox = New-Object System.Windows.Forms.GroupBox
-    $ProfileSelectionGroupBox.Location = New-Object System.Drawing.Size(240, 225)
-    $ProfileSelectionGroupBox.Size = New-Object System.Drawing.Size(220, 50)
-    $ProfileSelectionGroupBox.Text = 'Profile to Migrate'
-    $OldComputerTabPage.Controls.Add($ProfileSelectionGroupBox)
-
     # Select profile(s) button
     $SelectProfileButton = New-Object System.Windows.Forms.Button
-    $SelectProfileButton.Location = New-Object System.Drawing.Size(50, 15)
-    $SelectProfileButton.Size = New-Object System.Drawing.Size(120, 20)
-    $SelectProfileButton.Text = 'Profile(s) to Migrate'
+    $SelectProfileButton.Location = New-Object System.Drawing.Size(270, 225)
+    $SelectProfileButton.Size = New-Object System.Drawing.Size(160, 20)
+    $SelectProfileButton.Text = 'Select Profile(s) to Migrate'
     $SelectProfileButton.Add_Click({
         Update-Log "Please wait while profiles are found..."
         $Script:SelectedProfile = Get-UserProfiles | 
@@ -1109,7 +1106,7 @@ process {
         Update-Log "Profile(s) selected for migration:"
         $Script:SelectedProfile | ForEach-Object { Update-Log $_.UserName }
     })
-    $ProfileSelectionGroupBox.Controls.Add($SelectProfileButton)
+    $OldComputerTabPage.Controls.Add($SelectProfileButton)
 
     # Alternative save location group box
     $SaveDestinationGroupBox = New-Object System.Windows.Forms.GroupBox
