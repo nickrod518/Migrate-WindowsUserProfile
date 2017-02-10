@@ -22,6 +22,23 @@ begin {
 	# Verify that the user running this script has this extension in their username to ensure admin rights
     $Script:AdminExtension = '-admin'
 
+    # Default accounts to exclude from migration in the form of "Domain\UserName"
+    $Script:DefaultExcludeProfile = @(
+        "$ENV:Computername\default*",
+        "NT Service\*"
+    )
+
+    # By default local accounts that don't exist on the new computer will not be created for security measures
+    # To create these accounts set this to true
+    $Script:DefaultLACreate = $false
+
+    # By default local accounts that are created from the previous option will be disabled for security measures
+    # To enable these accounts set this to true
+    $Script:DefaultLACEnable = $false
+
+    # Default password for accounts created by previous two options
+    $Script:DefaultLAPassword = 'P@ssw0rd!'
+
 	# Use this to disallow migrations on IP's other than what's specified
     $Script:ValidIPAddress = '*'
 
@@ -34,10 +51,10 @@ begin {
     $Script:DefaultIncludeLocalAppData = $true
     $Script:DefaultIncludePrinters = $true
     $Script:DefaultIncludeRecycleBin = $true
-    $Script:DefaultIncludeMyDocuments = $false
+    $Script:DefaultIncludeMyDocuments = $true
     $Script:DefaultIncludeWallpapers = $true
     $Script:DefaultIncludeDesktop = $true
-    $Script:DefaultIncludeFavorites = $false
+    $Script:DefaultIncludeFavorites = $true
     $Script:DefaultIncludeMyMusic = $true
     $Script:DefaultIncludeMyPictures = $true
     $Script:DefaultIncludeMyVideo = $true
@@ -54,6 +71,9 @@ begin {
     $Script:DefaultEmailSender = 'MigrationAlert@company.com'
     $Script:DefaultEmailRecipients = @('my.email@company.com')
     $Script:DefaultSMTPServer = 'smtp.domain.local'
+
+    # LastLogin query when gathering profiles - disabling will speed up profile search
+    $Script:QueryLastLogon = $false
     
 	# End of configuration options - make no edits past this
 	###################################################################################################################
@@ -639,10 +659,12 @@ $WallpapersXML
             }
 
             # If profile is a domain other than $DefaultDomain, save this info to text file
-            $FullUserName = "$($Script:SelectedProfile.Domain)\$($Script:SelectedProfile.UserName)"
-            if ($Script:SelectedProfile.Domain -ne $DefaultDomain) {
-                New-Item "$Destination\DomainMigration.txt" -ItemType File -Value $FullUserName | Out-Null
-                Update-Log "Text file created with cross-domain information."
+            if ($RecentProfilesCheckBox.Checked -eq $false) {
+                $FullUserName = "$($Script:SelectedProfile.Domain)\$($Script:SelectedProfile.UserName)"
+                if ($Script:SelectedProfile.Domain -ne $DefaultDomain) {
+                    New-Item "$Destination\DomainMigration.txt" -ItemType File -Value $FullUserName -Force | Out-Null
+                    Update-Log "Text file created with cross-domain information."
+                }
             }
 
             # Create the scan configuration
@@ -659,13 +681,18 @@ $WallpapersXML
                 $Uncompressed = ''
             }
 
+            # Create a string for all users to exclude by default
+            foreach ($ExcludeProfile in $Script:DefaultExcludeProfile) {
+                $UsersToExclude += "`"/ue:$ExcludeProfile`""
+            }
+
             # Overwrite existing save state, use volume shadow copy method, exclude all but the selected profile(s)
             # Get the selected profiles
             if ($RecentProfilesCheckBox.Checked -eq $true) {
-                $Arguments = "`"$Destination`" `"/i:$Config`" /o /vsc /ui:* /uel:$($RecentProfilesDaysTextBox.Text) $Uncompressed $Logs"
+                $Arguments = "`"$Destination`" `"/i:$Config`" /o /vsc /ui:* $UsersToExclude /uel:$($RecentProfilesDaysTextBox.Text) $Uncompressed $Logs"
             } else {
                 $UsersToInclude += $Script:SelectedProfile | ForEach-Object { "`"/ui:$($_.Domain)\$($_.UserName)`"" }
-                $Arguments = "`"$Destination`" `"/i:$Config`" /o /vsc /ue:* $UsersToInclude $Uncompressed $Logs"
+                $Arguments = "`"$Destination`" `"/i:$Config`" /o /vsc /ue:* $UsersToExclude $UsersToInclude $Uncompressed $Logs"
             }
 
             # Begin saving user state to new computer
@@ -762,6 +789,17 @@ $WallpapersXML
             $Uncompressed = ''
         }
         
+        # Options for creating local accounts that don't already exist on new computer
+        $LocalAccountOptions = ''
+        if ($Script:DefaultLACreate -eq $true) {
+            $LocalAccountOptions = "`"/lac:$Script:DefaultLAPassword`""
+            if ($Script:DefaultLACEnable -eq $true) {
+                $LocalAccountOptions += ' /lae'
+            }
+        } else {
+            ''
+        }
+
         # Check if user to be migrated is coming from a different domain and do a cross-domain migration if so
         if ($CrossDomainMigrationGroupBox.Enabled) {
             $OldUser = "$($OldDomainTextBox.Text)\$($OldUserNameTextBox.Text)"
@@ -774,9 +812,9 @@ $WallpapersXML
             }
 
             Update-Log "$OldUser will be migrated as $NewUser."
-            $Arguments = "`"$Destination`" `"/i:$Destination\Config.xml`" `"/mu:$($OldUser):$NewUser`" $Uncompressed $Logs"
+            $Arguments = "`"$Destination`" `"/i:$Destination\Config.xml`" $LocalAccountOptions `"/mu:$($OldUser):$NewUser`" $Uncompressed $Logs"
         } else {
-            $Arguments = "`"$Destination`" `"/i:$Destination\Config.xml`" $Uncompressed $Logs"
+            $Arguments = "`"$Destination`" `"/i:$Destination\Config.xml`" $LocalAccountOptions $Uncompressed $Logs"
         }
 
         # Begin loading user state to this computer
@@ -901,7 +939,7 @@ $WallpapersXML
         Update-Log "               / \   ___ ___(_)___| |_ __ _ _ __ | |_   " -Color 'LightBlue'
         Update-Log "              / _ \ / __/ __| / __| __/ _`` | '_ \| __|  " -Color 'LightBlue'
         Update-Log "             / ___ \\__ \__ \ \__ \ || (_| | | | | |_   " -Color 'LightBlue'
-        Update-Log "            /_/   \_\___/___/_|___/\__\__,_|_| |_|\__| v2.6" -Color 'LightBlue'
+        Update-Log "            /_/   \_\___/___/_|___/\__\__,_|_| |_|\__| v2.7" -Color 'LightBlue'
         Update-Log
         Update-Log '                        by Nick Rodriguez' -Color 'Gold'
         Update-Log
