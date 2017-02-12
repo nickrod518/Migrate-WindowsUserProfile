@@ -74,7 +74,7 @@ begin {
 
 	#Define options for encypting the migration files files.
 	#Set this to $True or $False
-	$UseEncryption = $True
+	$UseEncryption = $False
 	$EncryptionString = 'P@ssw0rd!'
 
     # Users to additionially send every migration result to
