@@ -53,7 +53,7 @@ begin {
     $Script:DefaultIncludeAppData = $true
     $Script:DefaultIncludeLocalAppData = $true
     $Script:DefaultIncludePrinters = $true
-    $Script:DefaultIncludeRecycleBin = $true
+    $Script:DefaultIncludeRecycleBin = $false
     $Script:DefaultIncludeMyDocuments = $true
     $Script:DefaultIncludeWallpapers = $true
     $Script:DefaultIncludeDesktop = $true
@@ -69,7 +69,10 @@ begin {
         $Script:USMTPath = "$PSScriptRoot\USMT\x86"
     }
 
-	#Define Encryption options for the mig file.
+    #Define whether to continue on errors such as file allready exists during restore or read issue during capture.
+    $ContinueOnError = $True
+
+	#Define options for encypting the migration files files.
 	#Set this to $True or $False
 	$UseEncryption = $True
 	$EncryptionString = 'P@ssw0rd!'
@@ -85,6 +88,9 @@ begin {
     
 	# End of configuration options - make no edits past this
 	###################################################################################################################
+
+    # Define the script version.
+    $ScriptVersion = 2.8
 
     function Update-Log {
         param(
@@ -683,21 +689,32 @@ $WallpapersXML
 				$EncryptionKey = """$EncryptionString"""
 				$EncryptionSnytax = "/encrypt /key:$EncryptionKey"
 			}
+            
+            #Set the value to continue on error if it was specified above
+            if ($ContinueOnError -eq $True){
+                $ContinueCommand  = "/c"
+                }
+            if ($ContinueOnError -eq $False){
+                $ContinueCommand = ""
+            }
 			
-            #Determine if Custom XMLS were defined.
+            
+            # Create config syntax for scanstate for custom XMLs.           
             IF ($SelectedXMLS) {
                 #Create the scanstate syntax line for the config files.
                 foreach ($ConfigXML in $SelectedXMLS) {
                     $ConfigXMLPath = """$Script:USMTPath\$ConfigXML"""
                     $ScanstateConfig += "/i:$ConfigXMLPath "
-                }
-             IF (!($SelectedXMLS)) {         
+                 }
+            }
+
+            # Create config syntax for scanstate for generated XML.     
+            IF (!($SelectedXMLS)){ 
                 # Create the scan configuration
                 Update-Log 'Generating configuration file...'
                 $Config = Set-Config
                 $GeneratedConfig = """$Config"""
                 $ScanStateConfig = "/i:$GeneratedConfig"
-                }
             }
 
             # Generate parameter for logging
@@ -715,14 +732,15 @@ $WallpapersXML
                 $ExcludeProfile = """$ExcludeProfile"""
                 $UsersToExclude += "/ue:$ExcludeProfile "
             }
+            
 
             # Overwrite existing save state, use volume shadow copy method, exclude all but the selected profile(s)
             # Get the selected profiles
             if ($RecentProfilesCheckBox.Checked -eq $true) {
-                $Arguments = "`"$Destination`" $ScanStateConfig /o /vsc $UsersToExclude /uel:$($RecentProfilesDaysTextBox.Text) $EncryptionSnytax $Uncompressed $Logs /c"
+                $Arguments = "`"$Destination`" $ScanStateConfig /o /vsc $UsersToExclude /uel:$($RecentProfilesDaysTextBox.Text) $EncryptionSnytax $Uncompressed $Logs $ContinueCommand "
             } else {
                 $UsersToInclude += $Script:SelectedProfile | ForEach-Object { "`"/ui:$($_.Domain)\$($_.UserName)`"" }
-                $Arguments = "`"$Destination`" $ScanStateConfig /o /vsc /ue:* $UsersToExclude $UsersToInclude $EncryptionSnytax $Uncompressed $Logs /c"
+                $Arguments = "`"$Destination`" $ScanStateConfig /o /vsc /ue:* $UsersToExclude $UsersToInclude $EncryptionSnytax $Uncompressed $Logs $ContinueCommand "
             }
 
             # Begin saving user state to new computer
@@ -817,6 +835,21 @@ $WallpapersXML
 				$DecryptionKey = """$EncryptionString"""
 				$DecryptionSnytax = "/decrypt /key:$DecryptionKey"
 			}
+            
+            # Set the value to continue on error if it was specified above
+            if ($ContinueOnError -eq $True){
+                $ContinueCommand  = "/c"
+                }
+            if ($ContinueOnError -eq $false){
+                $ContinueCommand = ""
+            }
+
+            #Set the value for the Config file if one exists.
+            if (test-path "$Destination\Config.xml") {
+                $LoadStateConfigFile = """$Destination\Config.xml"""
+                $LoadStateConfig = "/i:$LoadStateConfigFile"
+            }
+
 
         # Generate arguments for load state process
         $Logs = "`"/l:$Destination\load.log`" `"/progress:$Destination\load_progress.log`""
@@ -849,16 +882,11 @@ $WallpapersXML
                 Update-Log "New user's user name must not be empty." -Color 'Red'
                 return
             }
-        #Set the value for the Config file if one exists.
-        $LoadStateConfig = ""
-        if (test-path "$Destination\Config.xml") {
-        $LoadStateConfig = `"/i:$Destination\Config.xml`"
-        }
 
             Update-Log "$OldUser will be migrated as $NewUser."
-            $Arguments = "`"$Destination`" $LoadStateConfig $LocalAccountOptions `"/mu:$($OldUser):$NewUser`" $DecryptionSnytax $Uncompressed $Logs"
+            $Arguments = "`"$Destination`" $LoadStateConfig $LocalAccountOptions `"/mu:$($OldUser):$NewUser`" $DecryptionSnytax $Uncompressed $Logs $ContinueCommand"
         } else {
-            $Arguments = "`"$Destination`" $LoadStateConfig $LocalAccountOptions $DecryptionSnytax $Uncompressed $Logs"
+            $Arguments = "`"$Destination`" $LoadStateConfig $LocalAccountOptions $DecryptionSnytax $Uncompressed $Logs $ContinueCommand"
         }
 
         # Begin loading user state to this computer
@@ -893,7 +921,6 @@ $WallpapersXML
 
             if ($USMTLoadState.ExitCode -eq 0){
             Update-Log "Complete!" -Color 'Green'
-d
             # Delete the save state data
           
                 try {
@@ -989,7 +1016,7 @@ d
         Update-Log "               / \   ___ ___(_)___| |_ __ _ _ __ | |_   " -Color 'LightBlue'
         Update-Log "              / _ \ / __/ __| / __| __/ _`` | '_ \| __|  " -Color 'LightBlue'
         Update-Log "             / ___ \\__ \__ \ \__ \ || (_| | | | | |_   " -Color 'LightBlue'
-        Update-Log "            /_/   \_\___/___/_|___/\__\__,_|_| |_|\__| v2.7" -Color 'LightBlue'
+        Update-Log "            /_/   \_\___/___/_|___/\__\__,_|_| |_|\__| $ScriptVersion" -Color 'LightBlue'
         Update-Log
         Update-Log '                        by Nick Rodriguez' -Color 'Gold'
         Update-Log
