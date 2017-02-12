@@ -69,6 +69,10 @@ begin {
         $Script:USMTPath = "$PSScriptRoot\USMT\x86"
     }
 
+	#Define Encryption options for the mig file.
+	#Set this to $True or $False
+	$UseEncryption = $True
+	$EncryptionString = 'P@ssw0rd!'
 
     # Users to additionially send every migration result to
     $Script:DefaultEmailEnabled = $false
@@ -671,6 +675,15 @@ $WallpapersXML
                 }
             }
 
+            # Clear encryption syntax in case it's already defined.
+            $EncryptionSnytax = ""
+            #Determine if Encryption has been requested
+			if ($UseEncryption -eq $True){
+				#Set the syntax for the encryption
+				$EncryptionKey = """$EncryptionString"""
+				$EncryptionSnytax = "/encrypt /key:$EncryptionKey"
+			}
+			
             #Determine if Custom XMLS were defined.
             IF ($SelectedXMLS) {
                 #Create the scanstate syntax line for the config files.
@@ -706,10 +719,10 @@ $WallpapersXML
             # Overwrite existing save state, use volume shadow copy method, exclude all but the selected profile(s)
             # Get the selected profiles
             if ($RecentProfilesCheckBox.Checked -eq $true) {
-                $Arguments = "`"$Destination`" $ScanStateConfig /o /vsc $UsersToExclude /uel:$($RecentProfilesDaysTextBox.Text) $Uncompressed $Logs"
+                $Arguments = "`"$Destination`" $ScanStateConfig /o /vsc $UsersToExclude /uel:$($RecentProfilesDaysTextBox.Text) $EncryptionSnytax $Uncompressed $Logs"
             } else {
                 $UsersToInclude += $Script:SelectedProfile | ForEach-Object { "`"/ui:$($_.Domain)\$($_.UserName)`"" }
-                $Arguments = "`"$Destination`" $ScanStateConfig /o /vsc /ue:* $UsersToExclude $UsersToInclude $Uncompressed $Logs"
+                $Arguments = "`"$Destination`" $ScanStateConfig /o /vsc /ue:* $UsersToExclude $UsersToInclude $EncryptionSnytax $Uncompressed $Logs"
             }
 
             # Begin saving user state to new computer
@@ -795,6 +808,15 @@ $WallpapersXML
             Update-Log "No saved state found at [$Destination]. Migration cancelled." -Color 'Red'
             return
         }
+		
+            # Clear decryption syntax in case it's already defined.
+            $DecryptionSyntax = ""
+			#Determine if Encryption has been requested
+			if ($UseEncryption -eq $True){
+				#Set the syntax for the encryption
+				$DecryptionKey = """$EncryptionString"""
+				$DecryptionSnytax = "/encrypt /key:$DecryptionKey"
+			}
 
         # Generate arguments for load state process
         $Logs = "`"/l:$Destination\load.log`" `"/progress:$Destination\load_progress.log`""
@@ -829,9 +851,9 @@ $WallpapersXML
             }
 
             Update-Log "$OldUser will be migrated as $NewUser."
-            $Arguments = "`"$Destination`" `"/i:$Destination\Config.xml`" $LocalAccountOptions `"/mu:$($OldUser):$NewUser`" $Uncompressed $Logs"
+            $Arguments = "`"$Destination`" `"/i:$Destination\Config.xml`" $LocalAccountOptions `"/mu:$($OldUser):$NewUser`" $DecryptionSnytax $Uncompressed $Logs"
         } else {
-            $Arguments = "`"$Destination`" `"/i:$Destination\Config.xml`" $LocalAccountOptions $Uncompressed $Logs"
+            $Arguments = "`"$Destination`" `"/i:$Destination\Config.xml`" $LocalAccountOptions $DecryptionSnytax $Uncompressed $Logs"
         }
 
         # Begin loading user state to this computer
