@@ -719,10 +719,10 @@ $WallpapersXML
             # Overwrite existing save state, use volume shadow copy method, exclude all but the selected profile(s)
             # Get the selected profiles
             if ($RecentProfilesCheckBox.Checked -eq $true) {
-                $Arguments = "`"$Destination`" $ScanStateConfig /o /vsc $UsersToExclude /uel:$($RecentProfilesDaysTextBox.Text) $EncryptionSnytax $Uncompressed $Logs"
+                $Arguments = "`"$Destination`" $ScanStateConfig /o /vsc $UsersToExclude /uel:$($RecentProfilesDaysTextBox.Text) $EncryptionSnytax $Uncompressed $Logs /c"
             } else {
                 $UsersToInclude += $Script:SelectedProfile | ForEach-Object { "`"/ui:$($_.Domain)\$($_.UserName)`"" }
-                $Arguments = "`"$Destination`" $ScanStateConfig /o /vsc /ue:* $UsersToExclude $UsersToInclude $EncryptionSnytax $Uncompressed $Logs"
+                $Arguments = "`"$Destination`" $ScanStateConfig /o /vsc /ue:* $UsersToExclude $UsersToInclude $EncryptionSnytax $Uncompressed $Logs /c"
             }
 
             # Begin saving user state to new computer
@@ -815,7 +815,7 @@ $WallpapersXML
 			if ($UseEncryption -eq $True){
 				#Set the syntax for the encryption
 				$DecryptionKey = """$EncryptionString"""
-				$DecryptionSnytax = "/encrypt /key:$DecryptionKey"
+				$DecryptionSnytax = "/decrypt /key:$DecryptionKey"
 			}
 
         # Generate arguments for load state process
@@ -849,11 +849,16 @@ $WallpapersXML
                 Update-Log "New user's user name must not be empty." -Color 'Red'
                 return
             }
+        #Set the value for the Config file if one exists.
+        $LoadStateConfig = ""
+        if (test-path "$Destination\Config.xml") {
+        $LoadStateConfig = `"/i:$Destination\Config.xml`"
+        }
 
             Update-Log "$OldUser will be migrated as $NewUser."
-            $Arguments = "`"$Destination`" `"/i:$Destination\Config.xml`" $LocalAccountOptions `"/mu:$($OldUser):$NewUser`" $DecryptionSnytax $Uncompressed $Logs"
+            $Arguments = "`"$Destination`" $LoadStateConfig $LocalAccountOptions `"/mu:$($OldUser):$NewUser`" $DecryptionSnytax $Uncompressed $Logs"
         } else {
-            $Arguments = "`"$Destination`" `"/i:$Destination\Config.xml`" $LocalAccountOptions $DecryptionSnytax $Uncompressed $Logs"
+            $Arguments = "`"$Destination`" $LoadStateConfig $LocalAccountOptions $DecryptionSnytax $Uncompressed $Logs"
         }
 
         # Begin loading user state to this computer
@@ -864,8 +869,8 @@ $WallpapersXML
         if ($Debug) { return }
 
         Update-Log "Loading state of $OldComputer..." -NoNewLine
-        Start-Process -FilePath $LoadState -ArgumentList $Arguments -Verb RunAs
-
+        $USMTLoadState = Start-Process -FilePath $LoadState -ArgumentList $Arguments -Verb RunAs -PassThru
+        $USMTLoadState
         # Give the process time to start before checking for its existence
         Start-Sleep -Seconds 3
 
@@ -876,8 +881,7 @@ $WallpapersXML
                 Get-USMTProgress
                 Start-Sleep -Seconds 1
             }
-            Update-Log "Complete!" -Color 'Green'
-            
+
             Update-Log 'Results:'
             Get-USMTResults -ActionType 'load'
 
@@ -887,16 +891,23 @@ $WallpapersXML
                 Start-Process explorer
             }
 
+            if ($USMTLoadState.ExitCode -eq 0){
+            Update-Log "Complete!" -Color 'Green'
+d
             # Delete the save state data
-            try {
-                Get-ChildItem $MigrationStorePath | Remove-Item -Recurse
-                Update-Log 'Successfully removed old save state data.'
-            } catch {
-                Update-Log 'There was an issue when trying to remove old save state data.'
+          
+                try {
+                    Get-ChildItem $MigrationStorePath | Remove-Item -Recurse
+                    Update-Log 'Successfully removed old save state data.'
+                } catch {
+                    Update-Log 'There was an issue when trying to remove old save state data.'
+                }
+            } ELSE {
+                update-log 'There was an issue during the loadstate process, please review the results. The state data was not deleted.'
             }
-        } catch {
-            Update-Log $_.Exception.Message -Color 'Red'
-        }
+            } catch {
+                Update-Log $_.Exception.Message -Color 'Red'
+                    }
     }
 
     function Test-ComputerConnection {
