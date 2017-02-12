@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Migrate user state from one PC to another using USMT.
 
@@ -13,6 +13,9 @@
 #>
 
 begin {
+    # Set ScripRoot variable to the path which the script is executed from.
+    $PSScriptRoot = Split-Path -Path $MyInvocation.MyCommand.Path
+
 	###################################################################################################################
     # Default configuration options - make edits starting here
 
@@ -50,7 +53,7 @@ begin {
     $Script:DefaultIncludeAppData = $true
     $Script:DefaultIncludeLocalAppData = $true
     $Script:DefaultIncludePrinters = $true
-    $Script:DefaultIncludeRecycleBin = $true
+    $Script:DefaultIncludeRecycleBin = $false
     $Script:DefaultIncludeMyDocuments = $true
     $Script:DefaultIncludeWallpapers = $true
     $Script:DefaultIncludeDesktop = $true
@@ -58,13 +61,21 @@ begin {
     $Script:DefaultIncludeMyMusic = $true
     $Script:DefaultIncludeMyPictures = $true
     $Script:DefaultIncludeMyVideo = $true
-
+	
 	# Get USMT binary path according to OS architecture. If you used the zip provided, unzip in the same directory as this script
     if ((Get-WmiObject Win32_OperatingSystem).OSArchitecture -eq '64-bit') { 
-        $Script:USMTPath = '.\USMT\amd64'
+        $Script:USMTPath = "$PSScriptRoot\USMT\amd64"
     } else { 
-        $Script:USMTPath = '.\USMT\x86'
+        $Script:USMTPath = "$PSScriptRoot\USMT\x86"
     }
+
+    #Define whether to continue on errors such as file allready exists during restore or read issue during capture.
+    $ContinueOnError = $True
+
+	#Define options for encypting the migration files files.
+	#Set this to $True or $False
+	$UseEncryption = $False
+	$EncryptionString = 'P@ssw0rd!'
 
     # Users to additionially send every migration result to
     $Script:DefaultEmailEnabled = $false
@@ -77,6 +88,9 @@ begin {
     
 	# End of configuration options - make no edits past this
 	###################################################################################################################
+
+    # Define the script version.
+    $ScriptVersion = 2.8
 
     function Update-Log {
         param(
@@ -667,9 +681,41 @@ $WallpapersXML
                 }
             }
 
-            # Create the scan configuration
-            Update-Log 'Generating configuration file...'
-            $Config = Set-Config
+            # Clear encryption syntax in case it's already defined.
+            $EncryptionSnytax = ""
+            #Determine if Encryption has been requested
+			if ($UseEncryption -eq $True){
+				#Set the syntax for the encryption
+				$EncryptionKey = """$EncryptionString"""
+				$EncryptionSnytax = "/encrypt /key:$EncryptionKey"
+			}
+            
+            #Set the value to continue on error if it was specified above
+            if ($ContinueOnError -eq $True){
+                $ContinueCommand  = "/c"
+                }
+            if ($ContinueOnError -eq $False){
+                $ContinueCommand = ""
+            }
+			
+            
+            # Create config syntax for scanstate for custom XMLs.           
+            IF ($SelectedXMLS) {
+                #Create the scanstate syntax line for the config files.
+                foreach ($ConfigXML in $SelectedXMLS) {
+                    $ConfigXMLPath = """$Script:USMTPath\$ConfigXML"""
+                    $ScanstateConfig += "/i:$ConfigXMLPath "
+                 }
+            }
+
+            # Create config syntax for scanstate for generated XML.     
+            IF (!($SelectedXMLS)){ 
+                # Create the scan configuration
+                Update-Log 'Generating configuration file...'
+                $Config = Set-Config
+                $GeneratedConfig = """$Config"""
+                $ScanStateConfig = "/i:$GeneratedConfig"
+            }
 
             # Generate parameter for logging
             $Logs = "`"/l:$Destination\scan.log`" `"/progress:$Destination\scan_progress.log`""
@@ -683,16 +729,18 @@ $WallpapersXML
 
             # Create a string for all users to exclude by default
             foreach ($ExcludeProfile in $Script:DefaultExcludeProfile) {
-                $UsersToExclude += "`"/ue:$ExcludeProfile`""
+                $ExcludeProfile = """$ExcludeProfile"""
+                $UsersToExclude += "/ue:$ExcludeProfile "
             }
+            
 
             # Overwrite existing save state, use volume shadow copy method, exclude all but the selected profile(s)
             # Get the selected profiles
             if ($RecentProfilesCheckBox.Checked -eq $true) {
-                $Arguments = "`"$Destination`" `"/i:$Config`" /o /vsc /ui:* $UsersToExclude /uel:$($RecentProfilesDaysTextBox.Text) $Uncompressed $Logs"
+                $Arguments = "`"$Destination`" $ScanStateConfig /o /vsc $UsersToExclude /uel:$($RecentProfilesDaysTextBox.Text) $EncryptionSnytax $Uncompressed $Logs $ContinueCommand "
             } else {
                 $UsersToInclude += $Script:SelectedProfile | ForEach-Object { "`"/ui:$($_.Domain)\$($_.UserName)`"" }
-                $Arguments = "`"$Destination`" `"/i:$Config`" /o /vsc /ue:* $UsersToExclude $UsersToInclude $Uncompressed $Logs"
+                $Arguments = "`"$Destination`" $ScanStateConfig /o /vsc /ue:* $UsersToExclude $UsersToInclude $EncryptionSnytax $Uncompressed $Logs $ContinueCommand "
             }
 
             # Begin saving user state to new computer
@@ -778,6 +826,30 @@ $WallpapersXML
             Update-Log "No saved state found at [$Destination]. Migration cancelled." -Color 'Red'
             return
         }
+		
+            # Clear decryption syntax in case it's already defined.
+            $DecryptionSyntax = ""
+			#Determine if Encryption has been requested
+			if ($UseEncryption -eq $True){
+				#Set the syntax for the encryption
+				$DecryptionKey = """$EncryptionString"""
+				$DecryptionSnytax = "/decrypt /key:$DecryptionKey"
+			}
+            
+            # Set the value to continue on error if it was specified above
+            if ($ContinueOnError -eq $True){
+                $ContinueCommand  = "/c"
+                }
+            if ($ContinueOnError -eq $false){
+                $ContinueCommand = ""
+            }
+
+            #Set the value for the Config file if one exists.
+            if (test-path "$Destination\Config.xml") {
+                $LoadStateConfigFile = """$Destination\Config.xml"""
+                $LoadStateConfig = "/i:$LoadStateConfigFile"
+            }
+
 
         # Generate arguments for load state process
         $Logs = "`"/l:$Destination\load.log`" `"/progress:$Destination\load_progress.log`""
@@ -812,9 +884,9 @@ $WallpapersXML
             }
 
             Update-Log "$OldUser will be migrated as $NewUser."
-            $Arguments = "`"$Destination`" `"/i:$Destination\Config.xml`" $LocalAccountOptions `"/mu:$($OldUser):$NewUser`" $Uncompressed $Logs"
+            $Arguments = "`"$Destination`" $LoadStateConfig $LocalAccountOptions `"/mu:$($OldUser):$NewUser`" $DecryptionSnytax $Uncompressed $Logs $ContinueCommand"
         } else {
-            $Arguments = "`"$Destination`" `"/i:$Destination\Config.xml`" $LocalAccountOptions $Uncompressed $Logs"
+            $Arguments = "`"$Destination`" $LoadStateConfig $LocalAccountOptions $DecryptionSnytax $Uncompressed $Logs $ContinueCommand"
         }
 
         # Begin loading user state to this computer
@@ -825,8 +897,8 @@ $WallpapersXML
         if ($Debug) { return }
 
         Update-Log "Loading state of $OldComputer..." -NoNewLine
-        Start-Process -FilePath $LoadState -ArgumentList $Arguments -Verb RunAs
-
+        $USMTLoadState = Start-Process -FilePath $LoadState -ArgumentList $Arguments -Verb RunAs -PassThru
+        $USMTLoadState
         # Give the process time to start before checking for its existence
         Start-Sleep -Seconds 3
 
@@ -837,8 +909,7 @@ $WallpapersXML
                 Get-USMTProgress
                 Start-Sleep -Seconds 1
             }
-            Update-Log "Complete!" -Color 'Green'
-            
+
             Update-Log 'Results:'
             Get-USMTResults -ActionType 'load'
 
@@ -848,16 +919,22 @@ $WallpapersXML
                 Start-Process explorer
             }
 
+            if ($USMTLoadState.ExitCode -eq 0){
+            Update-Log "Complete!" -Color 'Green'
             # Delete the save state data
-            try {
-                Get-ChildItem $MigrationStorePath | Remove-Item -Recurse
-                Update-Log 'Successfully removed old save state data.'
-            } catch {
-                Update-Log 'There was an issue when trying to remove old save state data.'
+          
+                try {
+                    Get-ChildItem $MigrationStorePath | Remove-Item -Recurse
+                    Update-Log 'Successfully removed old save state data.'
+                } catch {
+                    Update-Log 'There was an issue when trying to remove old save state data.'
+                }
+            } ELSE {
+                update-log 'There was an issue during the loadstate process, please review the results. The state data was not deleted.'
             }
-        } catch {
-            Update-Log $_.Exception.Message -Color 'Red'
-        }
+            } catch {
+                Update-Log $_.Exception.Message -Color 'Red'
+                    }
     }
 
     function Test-ComputerConnection {
@@ -939,7 +1016,7 @@ $WallpapersXML
         Update-Log "               / \   ___ ___(_)___| |_ __ _ _ __ | |_   " -Color 'LightBlue'
         Update-Log "              / _ \ / __/ __| / __| __/ _`` | '_ \| __|  " -Color 'LightBlue'
         Update-Log "             / ___ \\__ \__ \ \__ \ || (_| | | | | |_   " -Color 'LightBlue'
-        Update-Log "            /_/   \_\___/___/_|___/\__\__,_|_| |_|\__| v2.7" -Color 'LightBlue'
+        Update-Log "            /_/   \_\___/___/_|___/\__\__,_|_| |_|\__| $ScriptVersion" -Color 'LightBlue'
         Update-Log
         Update-Log '                        by Nick Rodriguez' -Color 'Gold'
         Update-Log
@@ -1252,6 +1329,11 @@ process {
         $ComponentName = $IncludeAppDataCheckBox.Text
         if ($IncludeAppDataCheckBox.Checked -eq $true) {
             Update-Log "$ComponentName will be included."
+            if ($SelectedXMLS){
+                Remove-variable -name SelectedXMLS -Scope Script -Force
+                Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+           }
+
         } else {
             Update-Log "$ComponentName will not be included."
         }
@@ -1268,6 +1350,11 @@ process {
         $ComponentName = $IncludeLocalAppDataCheckBox.Text
         if ($IncludeLocalAppDataCheckBox.Checked -eq $true) {
             Update-Log "$ComponentName will be included."
+            if ($SelectedXMLS){
+                Remove-variable -name SelectedXMLS -Scope Script -Force
+                Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+           }
+
         } else {
             Update-Log "$ComponentName will not be included." -Color Yellow
         }
@@ -1284,6 +1371,11 @@ process {
         $ComponentName = $IncludePrintersCheckBox.Text
         if ($IncludePrintersCheckBox.Checked -eq $true) {
             Update-Log "$ComponentName will be included."
+            if ($SelectedXMLS){
+                Remove-variable -name SelectedXMLS -Scope Script -Force
+                Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+           }
+
         } else {
             Update-Log "$ComponentName will not be included." -Color Yellow
         }
@@ -1300,6 +1392,11 @@ process {
         $ComponentName = $IncludeRecycleBinCheckBox.Text
         if ($IncludeRecycleBinCheckBox.Checked -eq $true) {
             Update-Log "$ComponentName will be included."
+            if ($SelectedXMLS){
+                Remove-variable -name SelectedXMLS -Scope Script -Force
+                Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+           }
+
         } else {
             Update-Log "$ComponentName will not be included." -Color Yellow
         }
@@ -1316,6 +1413,11 @@ process {
         $ComponentName = $IncludeMyDocumentsCheckBox.Text
         if ($IncludeMyDocumentsCheckBox.Checked -eq $true) {
             Update-Log "$ComponentName will be included."
+            if ($SelectedXMLS){
+                Remove-variable -name SelectedXMLS -Scope Script -Force
+                Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+           }
+
         } else {
             Update-Log "$ComponentName will not be included." -Color Yellow
         }
@@ -1332,6 +1434,11 @@ process {
         $ComponentName = $IncludeWallpapersCheckBox.Text
         if ($IncludeWallpapersCheckBox.Checked -eq $true) {
             Update-Log "$ComponentName will be included."
+            if ($SelectedXMLS){
+                Remove-variable -name SelectedXMLS -Scope Script -Force
+                Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+           }
+
         } else {
             Update-Log "$ComponentName will not be included." -Color Yellow
         }
@@ -1348,6 +1455,11 @@ process {
         $ComponentName = $IncludeDesktopCheckBox.Text
         if ($IncludeDesktopCheckBox.Checked -eq $true) {
             Update-Log "$ComponentName will be included."
+            if ($SelectedXMLS){
+                Remove-variable -name SelectedXMLS -Scope Script -Force
+                Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+           }
+
         } else {
             Update-Log "$ComponentName will not be included." -Color Yellow
         }
@@ -1364,6 +1476,11 @@ process {
         $ComponentName = $IncludeFavoritesCheckBox.Text
         if ($IncludeFavoritesCheckBox.Checked -eq $true) {
             Update-Log "$ComponentName will be included."
+            if ($SelectedXMLS){
+                Remove-variable -name SelectedXMLS -Scope Script -Force
+                Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+           }
+
         } else {
             Update-Log "$ComponentName will not be included." -Color Yellow
         }
@@ -1380,6 +1497,11 @@ process {
         $ComponentName = $IncludeMyMusicCheckBox.Text
         if ($IncludeMyMusicCheckBox.Checked -eq $true) {
             Update-Log "$ComponentName will be included."
+            if ($SelectedXMLS){
+                Remove-variable -name SelectedXMLS -Scope Script -Force
+                Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+           }
+
         } else {
             Update-Log "$ComponentName will not be included." -Color Yellow
         }
@@ -1396,6 +1518,11 @@ process {
         $ComponentName = $IncludeMyPicturesCheckBox.Text
         if ($IncludeMyPicturesCheckBox.Checked -eq $true) {
             Update-Log "$ComponentName will be included."
+            if ($SelectedXMLS){
+                Remove-variable -name SelectedXMLS -Scope Script -Force
+                Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+           }
+
         } else {
             Update-Log "$ComponentName will not be included." -Color Yellow
         }
@@ -1412,11 +1539,63 @@ process {
         $ComponentName = $IncludeMyVideoCheckBox.Text
         if ($IncludeMyVideoCheckBox.Checked -eq $true) {
             Update-Log "$ComponentName will be included."
+            if ($SelectedXMLS){
+                Remove-variable -name SelectedXMLS -Scope Script -Force
+                Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+           }
         } else {
             Update-Log "$ComponentName will not be included." -Color Yellow
         }
     })
     $InclusionsGroupBox.Controls.Add($IncludeMyVideoCheckBox)
+    
+    # Custom XML Box
+    $IncludeCustomXMLButton = New-Object System.Windows.Forms.Button
+   # $IncludeCustomXMLCheckBox.Checked = $DefaultIncludeMyVideo
+    $IncludeCustomXMLButton.Text = 'Custom XML(s)'
+    $IncludeCustomXMLButton.Location = New-Object System.Drawing.Size(110, 115) 
+    $IncludeCustomXMLButton.Size = New-Object System.Drawing.Size(100, 20)
+    $IncludeCustomXMLButton.Add_Click({
+        #Create an array object as well as clear any existing Custom XML list if present
+        $Script:DiscoveredXMLS = @()
+        $Script:SelectedXMLS = @()
+        Update-Log "Please wait while Custom XML Files are found..."
+        $Script:DiscoveredXMLS = get-childitem "$Script:USMTPath\*.xml"  -Exclude "MigLog.xml"
+        #Create a Description property
+        $Script:DiscoveredXMLS |Add-Member -NotePropertyName Description -NotePropertyValue "No Description Available"
+        foreach ($XMLFile in $Script:DiscoveredXMLS){
+            $XMLDescriptionFile = $XmlFIle -Replace ".xml",".txt"
+            if (Test-path $XMLDescriptionFIle){
+                $XMLDescription = get-content $XMLDescriptionFile
+                $XmlFile.Description = $XMLDescription
+                }
+            }
+
+        $Script:DiscoveredXMLS |
+            Select -Property Name,Description |
+                Out-GridView -Title 'Custom XML file selection' -OutputMode Multiple |foreach {$Script:SelectedXMLS += $_.Name}
+
+        update-log "Xmls(s) selected for migration:"
+        foreach ($XML in $Script:SelectedXMLS){
+             update-log $XML}
+
+    #Uncheck other Selections.
+
+    $IncludeAppDataCheckBox.Checked = $False
+    $IncludeLocalAppDataCheckBox.Checked = $False
+    $IncludePrintersCheckBox.Checked = $False
+    $IncludeRecycleBinCheckBox.Checked = $False
+    $IncludeWallpapersCheckBox.Checked = $False
+     $IncludeMyDocumentsCheckBox.Checked = $False
+    $IncludeDesktopCheckBox.Checked = $False
+    $IncludeFavoritesCheckBox.Checked = $False
+    $IncludeMyMusicCheckBox.Checked = $False
+    $IncludeMyPicturesCheckBox.Checked = $False
+    $IncludeMyPicturesCheckBox.Checked = $False
+    $IncludeMyVideoCheckBox.Checked = $False
+
+    })
+    $InclusionsGroupBox.Controls.Add($IncludeCustomXMLButton)
 
     # Extra directories selection group box
     $ExtraDirectoriesGroupBox = New-Object System.Windows.Forms.GroupBox
