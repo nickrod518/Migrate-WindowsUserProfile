@@ -20,10 +20,10 @@ begin {
     # Default configuration options - make edits starting here
 
 	# Default domain to use for profile creation
-    $Script:DefaultDomain = 'domain'
+    $Script:DefaultDomain = 'DOMAIN'
 
 	# Verify that the user running this script has this extension in their username to ensure admin rights
-    $Script:AdminExtension = 'admin'
+    $Script:AdminExtension = '-admin'
 
     # Default accounts to exclude from migration in the form of "Domain\UserName"
     $Script:DefaultExcludeProfile = @(
