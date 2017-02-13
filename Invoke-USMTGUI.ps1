@@ -744,8 +744,11 @@ $WallpapersXML
             }
 
             # Begin saving user state to new computer
+            #Create a value to show in the log in order to obscure the encryption key if one was used.
+            $LogArguments = $Arguments -Replace '/key:".*"','/key:(Hidden)'
             Update-Log "Command used:"
-            Update-Log "$ScanState $Arguments" -Color 'Cyan'
+            Update-Log "$ScanState $LogArguments" -Color 'Cyan'
+
 
             # If we're running in debug mode don't actually start the process
             if ($Debug) { return }
@@ -890,8 +893,11 @@ $WallpapersXML
         }
 
         # Begin loading user state to this computer
+        #Create a value in order to obscure the encryption key if one was specified.
+        $LogArguments = $Arguments -Replace '/key:".*"','/key:(Hidden)'
         Update-Log "Command used:"
-        Update-Log "$LoadState $Arguments" -Color 'Cyan'
+        Update-Log "$LoadState $LogArguments" -Color 'Cyan'
+		
 
         # If we're running in debug mode don't actually start the process
         if ($Debug) { return }
