@@ -108,6 +108,11 @@ begin {
         $LogTextBox.ScrollToCaret()
     }
 
+    function Read-EncryptionPassword {
+        [System.Reflection.Assembly]::LoadWithPartialName('Microsoft.VisualBasic') | Out-Null
+        $computer = [Microsoft.VisualBasic.Interaction]::InputBox("Enter password to encrypt the migration file", "Password", "$Script:EncryptionString")
+    }
+
     function Get-IPAddress { (Test-Connection -ComputerName (hostname) -Count 1).IPV4Address.IPAddressToString }
 
     # Get the host name the script is running from
