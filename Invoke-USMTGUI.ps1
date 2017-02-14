@@ -14,7 +14,7 @@
 
 begin {
     # Define the script version.
-    $ScriptVersion = 2.9
+    $ScriptVersion = 3.0
 
     # Set ScripRoot variable to the path which the script is executed from
     $ScriptRoot = if ($PSVersionTable.PSVersion.Major -lt 3) {
@@ -126,10 +126,12 @@ begin {
         $User.ProfileImagePath
     }
 
-    function Test-UserAdmin {
-        if (-not ($(Get-CurrentUserName) -like "*$AdminExtension")) {
-            Update-Log "You are running this script with user account $(Get-CurrentUserName), which is not a $AdminExtension account. " -Color 'Red' -NoNewLine
+    function Test-IsAdmin {
+        if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(`
+            [Security.Principal.WindowsBuiltInRole] 'Administrator')) {
+            Update-Log "You are not running this script with an admin account. " -Color 'Red' -NoNewLine
             Update-Log "Some tasks may fail if not run with admin credentials.`n" -Color 'Red'
+            Break
         }
     }
 
@@ -2019,7 +2021,7 @@ process {
     $Form.Controls.Add($DebugLabel)
 
     # Test if user is using an admin account
-    Test-UserAdmin
+    Test-IsAdmin
 
     # Test the version of PowerShell and disable incompatible features
     Test-PSVersion

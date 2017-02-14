@@ -3,9 +3,6 @@
 # Default domain to use for profile creation
 $DefaultDomain = 'DOMAIN'
 
-# Verify that the user running this script has this extension in their username to ensure admin rights
-$AdminExtension = '-admin'
-
 # Default accounts to exclude from migration in the form of "Domain\UserName"
 $DefaultExcludeProfile = @(
     "$ENV:Computername\default*",
