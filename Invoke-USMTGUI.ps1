@@ -14,7 +14,7 @@
 
 begin {
     # Define the script version.
-    $ScriptVersion = 3.0
+    $ScriptVersion = '3.0'
 
     # Set ScripRoot variable to the path which the script is executed from
     $ScriptRoot = if ($PSVersionTable.PSVersion.Major -lt 3) {
