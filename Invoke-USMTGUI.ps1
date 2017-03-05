@@ -13,8 +13,8 @@
 #>
 
 begin {
-    # Define the script version.
-    $ScriptVersion = '3.0'
+
+    ####### Begin Environment configuration #######
 
     # Set ScripRoot variable to the path which the script is executed from
     $ScriptRoot = if ($PSVersionTable.PSVersion.Major -lt 3) {
@@ -25,6 +25,13 @@ begin {
 
     # Load the options in the Config file
 	. "$ScriptRoot\Config.ps1"
+
+    #Set a value for the wscript comobject
+    $WScriptShell = new-object -comobject wscript.shell 
+
+    ####### End Environment configuration #######
+
+    ####### Begin Functions #######
 
     function Update-Log {
         param(
@@ -40,11 +47,6 @@ begin {
         if (-not $NoNewLine) { $LogTextBox.AppendText("`n") }
         $LogTextBox.Update()
         $LogTextBox.ScrollToCaret()
-    }
-
-    function Read-EncryptionPassword {
-        [System.Reflection.Assembly]::LoadWithPartialName('Microsoft.VisualBasic') | Out-Null
-        $computer = [Microsoft.VisualBasic.Interaction]::InputBox("Enter password to encrypt the migration file", "Password", "$Script:EncryptionString")
     }
 
     function Get-IPAddress { (Test-Connection -ComputerName (hostname) -Count 1).IPV4Address.IPAddressToString }
@@ -606,114 +608,123 @@ $WallpapersXML
             }
 
             # Create destination folder
-            try {
-                New-Item $Destination -ItemType Directory -Force | Out-Null
-            } catch {
-                Update-Log "Error while creating migration store [$Destination]: $($_.Exception.Message)" -Color 'Yellow'
-                return
-            }
-
-            # If profile is a domain other than $DefaultDomain, save this info to text file
-            if ($RecentProfilesCheckBox.Checked -eq $false) {
-                $FullUserName = "$($Script:SelectedProfile.Domain)\$($Script:SelectedProfile.UserName)"
-                if ($Script:SelectedProfile.Domain -ne $DefaultDomain) {
-                    New-Item "$Destination\DomainMigration.txt" -ItemType File -Value $FullUserName -Force | Out-Null
-                    Update-Log "Text file created with cross-domain information."
-                }
-            }
-
-            # Clear encryption syntax in case it's already defined.
-            $EncryptionSnytax = ""
-            # Determine if Encryption has been requested
-			if ($UseEncryption -eq $True){
-				# Set the syntax for the encryption
-				$EncryptionKey = """$EncryptionString"""
-				$EncryptionSnytax = "/encrypt /key:$EncryptionKey"
+			if (!(Test-Path $Destination)){
+				try {
+					New-Item $Destination -ItemType Directory -Force | Out-Null
+				} catch {
+					Update-Log "Error while creating migration store [$Destination]: $($_.Exception.Message)" -Color 'Yellow'
+					return
+				}
 			}
-            
-            #Set the value to continue on error if it was specified above
-            if ($ContinueOnError -eq $True){
-                $ContinueCommand  = "/c"
-                }
-            if ($ContinueOnError -eq $False){
-                $ContinueCommand = ""
-            }
 			
-            
-            # Create config syntax for scanstate for custom XMLs.           
-            IF ($SelectedXMLS) {
-                #Create the scanstate syntax line for the config files.
-                foreach ($ConfigXML in $SelectedXMLS) {
-                    $ConfigXMLPath = """$Script:USMTPath\$ConfigXML"""
-                    $ScanstateConfig += "/i:$ConfigXMLPath "
-                 }
-            }
+			#Verify that the Destination folder is valid.
+			if (Test-Path $Destination){
+			
+				# If profile is a domain other than $DefaultDomain, save this info to text file
+				if ($RecentProfilesCheckBox.Checked -eq $false) {
+					$FullUserName = "$($Script:SelectedProfile.Domain)\$($Script:SelectedProfile.UserName)"
+					if ($Script:SelectedProfile.Domain -ne $DefaultDomain) {
+						New-Item "$Destination\DomainMigration.txt" -ItemType File -Value $FullUserName -Force | Out-Null
+						Update-Log "Text file created with cross-domain information."
+					}
+				}
 
-            # Create config syntax for scanstate for generated XML.     
-            IF (!($SelectedXMLS)){ 
-                # Create the scan configuration
-                Update-Log 'Generating configuration file...'
-                $Config = Set-Config
-                $GeneratedConfig = """$Config"""
-                $ScanStateConfig = "/i:$GeneratedConfig"
-            }
+				# Clear encryption syntax in case it's already defined.
+				$EncryptionSnytax = ""
+				# Determine if Encryption has been requested
+				if ($Script:EncryptionPasswordSet -eq $True){
+					# Set the syntax for the encryption
+					$EncryptionKey = """$Script:EncryptionPassword"""
+					$EncryptionSnytax = "/encrypt /key:$EncryptionKey"
+				}
+				
+				#Set the value to continue on error if it was specified above
+				if ($ContinueOnError -eq $True){
+					$ContinueCommand  = "/c"
+					}
+				if ($ContinueOnError -eq $False){
+					$ContinueCommand = ""
+				}
+				
+				
+				# Create config syntax for scanstate for custom XMLs.           
+				IF ($SelectedXMLS) {
+					#Create the scanstate syntax line for the config files.
+					foreach ($ConfigXML in $SelectedXMLS) {
+						$ConfigXMLPath = """$Script:USMTPath\$ConfigXML"""
+						$ScanstateConfig += "/i:$ConfigXMLPath "
+					 }
+				}
 
-            # Generate parameter for logging
-            $Logs = "`"/l:$Destination\scan.log`" `"/progress:$Destination\scan_progress.log`""
+				# Create config syntax for scanstate for generated XML.     
+				IF (!($SelectedXMLS)){ 
+					# Create the scan configuration
+					Update-Log 'Generating configuration file...'
+					$Config = Set-Config
+					$GeneratedConfig = """$Config"""
+					$ScanStateConfig = "/i:$GeneratedConfig"
+				}
 
-            # Set parameter for whether save state is compressed
-            if ($UncompressedCheckBox.Checked -eq $true) {
-                $Uncompressed = '/nocompress'
-            } else {
-                $Uncompressed = ''
-            }
+				# Generate parameter for logging
+				$Logs = "`"/l:$Destination\scan.log`" `"/progress:$Destination\scan_progress.log`""
 
-            # Create a string for all users to exclude by default
-            foreach ($ExcludeProfile in $Script:DefaultExcludeProfile) {
-                $ExcludeProfile = """$ExcludeProfile"""
-                $UsersToExclude += "/ue:$ExcludeProfile "
-            }
-            
+				# Set parameter for whether save state is compressed
+				if ($UncompressedCheckBox.Checked -eq $true) {
+					$Uncompressed = '/nocompress'
+				} else {
+					$Uncompressed = ''
+				}
 
-            # Overwrite existing save state, use volume shadow copy method, exclude all but the selected profile(s)
-            # Get the selected profiles
-            if ($RecentProfilesCheckBox.Checked -eq $true) {
-                $Arguments = "`"$Destination`" $ScanStateConfig /o /vsc $UsersToExclude /uel:$($RecentProfilesDaysTextBox.Text) $EncryptionSnytax $Uncompressed $Logs $ContinueCommand "
-            } else {
-                $UsersToInclude += $Script:SelectedProfile | ForEach-Object { "`"/ui:$($_.Domain)\$($_.UserName)`"" }
-                $Arguments = "`"$Destination`" $ScanStateConfig /o /vsc /ue:* $UsersToExclude $UsersToInclude $EncryptionSnytax $Uncompressed $Logs $ContinueCommand "
-            }
+				# Create a string for all users to exclude by default
+				foreach ($ExcludeProfile in $Script:DefaultExcludeProfile) {
+					$ExcludeProfile = """$ExcludeProfile"""
+					$UsersToExclude += "/ue:$ExcludeProfile "
+				}
+				
 
-            # Begin saving user state to new computer
-            # Create a value to show in the log in order to obscure the encryption key if one was used.
-            $LogArguments = $Arguments -Replace '/key:".*"','/key:(Hidden)'
-            Update-Log "Command used:"
-            Update-Log "$ScanState $LogArguments" -Color 'Cyan'
+				# Overwrite existing save state, use volume shadow copy method, exclude all but the selected profile(s)
+				# Get the selected profiles
+				if ($RecentProfilesCheckBox.Checked -eq $true) {
+					$Arguments = "`"$Destination`" $ScanStateConfig /o /vsc $UsersToExclude /uel:$($RecentProfilesDaysTextBox.Text) $EncryptionSnytax $Uncompressed $Logs $ContinueCommand "
+				} else {
+					$UsersToInclude += $Script:SelectedProfile | ForEach-Object { "`"/ui:$($_.Domain)\$($_.UserName)`"" }
+					$Arguments = "`"$Destination`" $ScanStateConfig /o /vsc /ue:* $UsersToExclude $UsersToInclude $EncryptionSnytax $Uncompressed $Logs $ContinueCommand "
+				}
+
+				# Begin saving user state to new computer
+				# Create a value to show in the log in order to obscure the encryption key if one was used.
+				$LogArguments = $Arguments -Replace '/key:".*"','/key:(Hidden)'
+
+				Update-Log "Command used:"
+				Update-Log "$ScanState $LogArguments" -Color 'Cyan'
 
 
-            # If we're running in debug mode don't actually start the process
-            if ($Debug) { return }
+				# If we're running in debug mode don't actually start the process
+				if ($Debug) { return }
 
-            Update-Log "Saving state of $OldComputer to $Destination..." -NoNewLine
-            Start-Process -FilePath $ScanState -ArgumentList $Arguments -Verb RunAs
+				Update-Log "Saving state of $OldComputer to $Destination..." -NoNewLine
+				Start-Process -FilePath $ScanState -ArgumentList $Arguments -Verb RunAs
 
-            # Give the process time to start before checking for its existence
-            Start-Sleep -Seconds 3
+				# Give the process time to start before checking for its existence
+				Start-Sleep -Seconds 3
 
-            # Wait until the save state is complete
-            try {
-                $ScanProcess = Get-Process -Name scanstate -ErrorAction Stop
-                while (-not $ScanProcess.HasExited) {
-                    Get-USMTProgress
-                    Start-Sleep -Seconds 3
-                }
-                Update-Log "Complete!" -Color 'Green'
+				# Wait until the save state is complete
+				try {
+					$ScanProcess = Get-Process -Name scanstate -ErrorAction Stop
+					while (-not $ScanProcess.HasExited) {
+						Get-USMTProgress
+						Start-Sleep -Seconds 3
+					}
+					Update-Log "Complete!" -Color 'Green'
 
-                Update-Log 'Results:'
-                Get-USMTResults -ActionType 'scan'
-            } catch {
-                Update-Log $_.Exception.Message -Color 'Red'
-            }
+					Update-Log 'Results:'
+					Get-USMTResults -ActionType 'scan'
+				} catch {
+					Update-Log $_.Exception.Message -Color 'Red'
+				}
+			} ELSE {
+				Update-Log "Error when trying to access [$Destination] Please verify that the user account running the utility has appropriate permissions to the folder.: $($_.Exception.Message)" -Color 'Yellow'
+			}
         }
     }
 
@@ -774,9 +785,9 @@ $WallpapersXML
             # Clear decryption syntax in case it's already defined.
             $DecryptionSyntax = ""
 			# Determine if Encryption has been requested
-			if ($UseEncryption -eq $True){
+			if ($Script:EncryptionPasswordSet -eq $True){
 				# Set the syntax for the encryption
-				$DecryptionKey = """$EncryptionString"""
+				$DecryptionKey = """$Script:EncryptionPassword"""
 				$DecryptionSnytax = "/decrypt /key:$DecryptionKey"
 			}
             
@@ -1005,6 +1016,59 @@ $WallpapersXML
         }
     }
 
+    function PasswordPrompt
+    {
+        #Set the password set flag to false.
+        $Script:EncryptionPasswordSet = $Null
+        #Clear the password reset flag.
+        $Script:EncryptionPasswordRetry = $Null
+    
+        # Prompt the user for an encryption password.
+        $Script:EncryptionPassword = $Null
+        $Script:EncryptionPassword = Get-Credential -Message "Enter the encryption password" -UserName "Enter a password Below"
+        # Prompt the user again for confirmation.
+        $Script:EncryptionPasswordConfirm = $Null
+        $Script:EncryptionPasswordConfirm = Get-Credential -Message "Please confirm the encryption password" -UserName "Enter a password Below"
+
+        # Convert the password strings to plain text so that they can be compared.
+        if ($Script:EncryptionPassword.Password){
+            $Script:EncryptionPassword = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
+                [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Script:EncryptionPassword.Password))
+        }
+
+        if ($Script:EncryptionPasswordConfirm.Password){
+            $Script:EncryptionPasswordConfirm = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
+                [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Script:EncryptionPasswordConfirm.Password))
+        }
+
+        # Compare the password strings and verify that they match
+        if ($Script:EncryptionPassword -NE $Script:EncryptionPasswordConfirm -or $Script:EncryptionPassword -eq "" -or $Script:EncryptionPassword -eq $Null){
+                Update-Log "Password did not match or was blank." -Color 'Yellow'
+        } ELSE {
+            #Set a flag that the password was successfully set
+            $Script:EncryptionPasswordSet = $True
+        }
+
+        # Prompt the user to try again if the strings did not match.
+        if ($Script:EncryptionPasswordSet -NE $True -and $Script:EncryptionPasswordRetry -NE "7"){
+            do {
+                $Script:EncryptionPasswordRetry = $WScriptShell.popup(
+                "Encryption password was not successfully set, try again?", ` 
+                0,"Retry Password",4)
+
+                #Prompt again if the user opted to retry
+                if ($Script:EncryptionPasswordRetry -NE "7"){
+                     Update-Log "Retrying password prompt." -Color 'Yellow'
+                    PasswordPrompt
+                }
+
+            }
+            while ($Script:EncryptionPasswordSet -NE $True -and $Script:EncryptionPasswordRetry -NE "7")
+        }
+
+    }
+
+
     # Hide parent PowerShell window unless run from ISE
     if (-not $(Test-IsISE)) {
         $ShowWindowAsync = Add-Type -MemberDefinition @"
@@ -1020,6 +1084,9 @@ public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
 
     $Script:Destination = ''
 }
+
+####### End Functions #######
+
 
 process {
     # Create form
@@ -1570,10 +1637,31 @@ process {
     $AddExtraDirectoryButton.Add_Click({ Add-ExtraDirectory })
     $ExtraDirectoriesDataGridView.Controls.Add($AddExtraDirectoryButton)
 
+    # Scanstate Encryption check box
+    $ScanStateEncryptionCheckBox = New-Object System.Windows.Forms.CheckBox
+    $ScanStateEncryptionCheckBox.Text = 'Encrypt captured Data.'
+    $ScanStateEncryptionCheckBox.Location = New-Object System.Drawing.Size(280, 340) 
+    $ScanStateEncryptionCheckBox.Size = New-Object System.Drawing.Size(300, 30)
+    $ScanStateEncryptionCheckBox.Add_Click({
+        if ($ScanStateEncryptionCheckBox.Checked -eq $true) {
+            # Prompt for Encryption password
+            Update-Log 'Encryption for save state enabled, prompting for password.' -Color 'Yellow'
+            PasswordPrompt
+            #Disable the use of the encryption password was not sucessfully set.
+            if ($Script:EncryptionPasswordSet -NE $True){
+                Update-Log "Encryption password was not set." -Color 'Yellow'
+                $ScanStateEncryptionCheckBox.Checked = $false
+            } else {
+                Update-Log 'Encyption password successfully set.' -Color 'LightBlue'
+            }
+        }
+    })
+    $OldComputerTabPage.Controls.Add($ScanStateEncryptionCheckBox)
+
     # Uncompressed storage check box
     $UncompressedCheckBox = New-Object System.Windows.Forms.CheckBox
     $UncompressedCheckBox.Text = 'Uncompressed storage'
-    $UncompressedCheckBox.Location = New-Object System.Drawing.Size(280, 350) 
+    $UncompressedCheckBox.Location = New-Object System.Drawing.Size(280, 370) 
     $UncompressedCheckBox.Size = New-Object System.Drawing.Size(300, 30)
     $UncompressedCheckBox.Add_Click({
         if ($UncompressedCheckBox.Checked -eq $true) {
@@ -1840,6 +1928,29 @@ process {
         }
     })
     $NewComputerTabPage.Controls.Add($OverrideCheckBox)
+
+    # LoadState Encryption check box
+    $LoadStateEncryptionCheckBox = New-Object System.Windows.Forms.CheckBox
+    $LoadStateEncryptionCheckBox.Text = 'Saved data was encrypted.'
+    $LoadStateEncryptionCheckBox.Location = New-Object System.Drawing.Size(280, 250) 
+    $LoadStateEncryptionCheckBox.Size = New-Object System.Drawing.Size(300, 30)
+    $LoadStateEncryptionCheckBox.Add_Click({
+        if ($LoadStateEncryptionCheckBox.Checked -eq $true) {
+            # Prompt for Encryption password
+            Update-Log 'Encryption for load state enabled, prompting for password.' -Color 'Yellow'
+            PasswordPrompt
+            #Disable the use of the encryption password was not sucessfully set.
+            if ($Script:EncryptionPasswordSet -NE $True){
+                Update-Log "Encryption password was not set." -Color 'Yellow'
+                $LoadStateEncryptionCheckBox.Checked = $false
+            } else {
+                Update-Log 'Encyption password successfully set.' -Color 'LightBlue'
+            }
+        }
+    })
+    $NewComputerTabPage.Controls.Add($LoadStateEncryptionCheckBox)
+
+
 
     Show-DomainInfo
 

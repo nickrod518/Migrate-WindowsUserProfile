@@ -50,10 +50,6 @@ if ((Get-WmiObject Win32_OperatingSystem).OSArchitecture -eq '64-bit') {
 # Define whether to continue on errors such as file allready exists during restore or read issue during capture.
 $ContinueOnError = $True
 
-# Define options for encypting the migration files files - set this to $True or $False
-$UseEncryption = $False
-$EncryptionString = 'P@ssw0rd!'
-
 # Users to additionially send every migration result to
 $DefaultEmailEnabled = $false
 $DefaultEmailSender = 'MigrationAlert@company.com'
