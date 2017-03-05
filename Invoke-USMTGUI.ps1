@@ -13,8 +13,8 @@
 #>
 
 begin {
-    # Define the script version.
-    $ScriptVersion = '3.1'
+
+    ####### Begin Environment configuration #######
 
     # Set ScripRoot variable to the path which the script is executed from
     $ScriptRoot = if ($PSVersionTable.PSVersion.Major -lt 3) {
@@ -25,6 +25,13 @@ begin {
 
     # Load the options in the Config file
 	. "$ScriptRoot\Config.ps1"
+
+    #Set a value for the wscript comobject
+    $WScriptShell = new-object -comobject wscript.shell 
+
+    ####### End Environment configuration #######
+
+    ####### Begin Functions #######
 
     function Update-Log {
         param(
@@ -40,11 +47,6 @@ begin {
         if (-not $NoNewLine) { $LogTextBox.AppendText("`n") }
         $LogTextBox.Update()
         $LogTextBox.ScrollToCaret()
-    }
-
-    function Read-EncryptionPassword {
-        [System.Reflection.Assembly]::LoadWithPartialName('Microsoft.VisualBasic') | Out-Null
-        $computer = [Microsoft.VisualBasic.Interaction]::InputBox("Enter password to encrypt the migration file", "Password", "$Script:EncryptionString")
     }
 
     function Get-IPAddress { (Test-Connection -ComputerName (hostname) -Count 1).IPV4Address.IPAddressToString }
@@ -630,9 +632,9 @@ $WallpapersXML
 				# Clear encryption syntax in case it's already defined.
 				$EncryptionSnytax = ""
 				# Determine if Encryption has been requested
-				if ($UseEncryption -eq $True){
+				if ($Script:EncryptionPasswordSet -eq $True){
 					# Set the syntax for the encryption
-					$EncryptionKey = """$EncryptionString"""
+					$EncryptionKey = """$Script:EncryptionPassword"""
 					$EncryptionSnytax = "/encrypt /key:$EncryptionKey"
 				}
 				
@@ -692,6 +694,7 @@ $WallpapersXML
 				# Begin saving user state to new computer
 				# Create a value to show in the log in order to obscure the encryption key if one was used.
 				$LogArguments = $Arguments -Replace '/key:".*"','/key:(Hidden)'
+
 				Update-Log "Command used:"
 				Update-Log "$ScanState $LogArguments" -Color 'Cyan'
 
@@ -720,7 +723,7 @@ $WallpapersXML
 					Update-Log $_.Exception.Message -Color 'Red'
 				}
 			} ELSE {
-				Update-Log "Error when trying to access [$Destination] Please verify that the user account running the utility has appropriate permissions to the folder. $($_.Exception.Message)" -Color 'Yellow'
+				Update-Log "Error when trying to access [$Destination] Please verify that the user account running the utility has appropriate permissions to the folder.: $($_.Exception.Message)" -Color 'Yellow'
 			}
         }
     }
@@ -782,9 +785,9 @@ $WallpapersXML
             # Clear decryption syntax in case it's already defined.
             $DecryptionSyntax = ""
 			# Determine if Encryption has been requested
-			if ($UseEncryption -eq $True){
+			if ($Script:EncryptionPasswordSet -eq $True){
 				# Set the syntax for the encryption
-				$DecryptionKey = """$EncryptionString"""
+				$DecryptionKey = """$Script:EncryptionPassword"""
 				$DecryptionSnytax = "/decrypt /key:$DecryptionKey"
 			}
             
@@ -1013,6 +1016,59 @@ $WallpapersXML
         }
     }
 
+    function PasswordPrompt
+    {
+        #Set the password set flag to false.
+        $Script:EncryptionPasswordSet = $Null
+        #Clear the password reset flag.
+        $Script:EncryptionPasswordRetry = $Null
+    
+        # Prompt the user for an encryption password.
+        $Script:EncryptionPassword = $Null
+        $Script:EncryptionPassword = Get-Credential -Message "Enter the encryption password" -UserName "Enter a password Below"
+        # Prompt the user again for confirmation.
+        $Script:EncryptionPasswordConfirm = $Null
+        $Script:EncryptionPasswordConfirm = Get-Credential -Message "Please confirm the encryption password" -UserName "Enter a password Below"
+
+        # Convert the password strings to plain text so that they can be compared.
+        if ($Script:EncryptionPassword.Password){
+            $Script:EncryptionPassword = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
+                [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Script:EncryptionPassword.Password))
+        }
+
+        if ($Script:EncryptionPasswordConfirm.Password){
+            $Script:EncryptionPasswordConfirm = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
+                [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Script:EncryptionPasswordConfirm.Password))
+        }
+
+        # Compare the password strings and verify that they match
+        if ($Script:EncryptionPassword -NE $Script:EncryptionPasswordConfirm -or $Script:EncryptionPassword -eq "" -or $Script:EncryptionPassword -eq $Null){
+                Update-Log "Password did not match or was blank." -Color 'Yellow'
+        } ELSE {
+            #Set a flag that the password was successfully set
+            $Script:EncryptionPasswordSet = $True
+        }
+
+        # Prompt the user to try again if the strings did not match.
+        if ($Script:EncryptionPasswordSet -NE $True -and $Script:EncryptionPasswordRetry -NE "7"){
+            do {
+                $Script:EncryptionPasswordRetry = $WScriptShell.popup(
+                "Encryption password was not successfully set, try again?", ` 
+                0,"Retry Password",4)
+
+                #Prompt again if the user opted to retry
+                if ($Script:EncryptionPasswordRetry -NE "7"){
+                     Update-Log "Retrying password prompt." -Color 'Yellow'
+                    PasswordPrompt
+                }
+
+            }
+            while ($Script:EncryptionPasswordSet -NE $True -and $Script:EncryptionPasswordRetry -NE "7")
+        }
+
+    }
+
+
     # Hide parent PowerShell window unless run from ISE
     if (-not $(Test-IsISE)) {
         $ShowWindowAsync = Add-Type -MemberDefinition @"
@@ -1028,6 +1084,9 @@ public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
 
     $Script:Destination = ''
 }
+
+####### End Functions #######
+
 
 process {
     # Create form
@@ -1578,10 +1637,31 @@ process {
     $AddExtraDirectoryButton.Add_Click({ Add-ExtraDirectory })
     $ExtraDirectoriesDataGridView.Controls.Add($AddExtraDirectoryButton)
 
+    # Scanstate Encryption check box
+    $ScanStateEncryptionCheckBox = New-Object System.Windows.Forms.CheckBox
+    $ScanStateEncryptionCheckBox.Text = 'Encrypt captured Data.'
+    $ScanStateEncryptionCheckBox.Location = New-Object System.Drawing.Size(280, 340) 
+    $ScanStateEncryptionCheckBox.Size = New-Object System.Drawing.Size(300, 30)
+    $ScanStateEncryptionCheckBox.Add_Click({
+        if ($ScanStateEncryptionCheckBox.Checked -eq $true) {
+            # Prompt for Encryption password
+            Update-Log 'Encryption for save state enabled, prompting for password.' -Color 'Yellow'
+            PasswordPrompt
+            #Disable the use of the encryption password was not sucessfully set.
+            if ($Script:EncryptionPasswordSet -NE $True){
+                Update-Log "Encryption password was not set." -Color 'Yellow'
+                $ScanStateEncryptionCheckBox.Checked = $false
+            } else {
+                Update-Log 'Encyption password successfully set.' -Color 'LightBlue'
+            }
+        }
+    })
+    $OldComputerTabPage.Controls.Add($ScanStateEncryptionCheckBox)
+
     # Uncompressed storage check box
     $UncompressedCheckBox = New-Object System.Windows.Forms.CheckBox
     $UncompressedCheckBox.Text = 'Uncompressed storage'
-    $UncompressedCheckBox.Location = New-Object System.Drawing.Size(280, 350) 
+    $UncompressedCheckBox.Location = New-Object System.Drawing.Size(280, 370) 
     $UncompressedCheckBox.Size = New-Object System.Drawing.Size(300, 30)
     $UncompressedCheckBox.Add_Click({
         if ($UncompressedCheckBox.Checked -eq $true) {
@@ -1848,6 +1928,29 @@ process {
         }
     })
     $NewComputerTabPage.Controls.Add($OverrideCheckBox)
+
+    # LoadState Encryption check box
+    $LoadStateEncryptionCheckBox = New-Object System.Windows.Forms.CheckBox
+    $LoadStateEncryptionCheckBox.Text = 'Saved data was encrypted.'
+    $LoadStateEncryptionCheckBox.Location = New-Object System.Drawing.Size(280, 250) 
+    $LoadStateEncryptionCheckBox.Size = New-Object System.Drawing.Size(300, 30)
+    $LoadStateEncryptionCheckBox.Add_Click({
+        if ($LoadStateEncryptionCheckBox.Checked -eq $true) {
+            # Prompt for Encryption password
+            Update-Log 'Encryption for load state enabled, prompting for password.' -Color 'Yellow'
+            PasswordPrompt
+            #Disable the use of the encryption password was not sucessfully set.
+            if ($Script:EncryptionPasswordSet -NE $True){
+                Update-Log "Encryption password was not set." -Color 'Yellow'
+                $LoadStateEncryptionCheckBox.Checked = $false
+            } else {
+                Update-Log 'Encyption password successfully set.' -Color 'LightBlue'
+            }
+        }
+    })
+    $NewComputerTabPage.Controls.Add($LoadStateEncryptionCheckBox)
+
+
 
     Show-DomainInfo
 
