@@ -50,6 +50,9 @@ if ((Get-WmiObject Win32_OperatingSystem).OSArchitecture -eq '64-bit') {
 # Define whether to continue on errors such as file allready exists during restore or read issue during capture.
 $ContinueOnError = $True
 
+#Define how to handle EFS format files. Options are abort (default behaviour), skip, decryptcopy, copyraw
+$EFSHandling = "abort"
+
 # Users to additionially send every migration result to
 $DefaultEmailEnabled = $false
 $DefaultEmailSender = 'MigrationAlert@company.com'

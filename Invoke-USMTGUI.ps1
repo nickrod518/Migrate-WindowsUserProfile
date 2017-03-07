@@ -15,6 +15,9 @@
 begin {
 
     ####### Begin Environment configuration #######
+	
+	# Define the script version
+	$ScriptVersion = "3.2"
 
     # Set ScripRoot variable to the path which the script is executed from
     $ScriptRoot = if ($PSVersionTable.PSVersion.Major -lt 3) {
@@ -633,6 +636,9 @@ $WallpapersXML
 				$EncryptionSnytax = ""
 				# Determine if Encryption has been requested
 				if ($Script:EncryptionPasswordSet -eq $True){
+                    #Disable Compression
+                    $Script:UncompressedSource = $false
+                    $Uncompressed = ''
 					# Set the syntax for the encryption
 					$EncryptionKey = """$Script:EncryptionPassword"""
 					$EncryptionSnytax = "/encrypt /key:$EncryptionKey"
@@ -681,14 +687,19 @@ $WallpapersXML
 					$UsersToExclude += "/ue:$ExcludeProfile "
 				}
 				
+                # Set the EFS Syntax based on the config.
+                if ($EFSHandling){
+                    $EFSSyntax = "/efs:$EFSHandling"
+                }
+
 
 				# Overwrite existing save state, use volume shadow copy method, exclude all but the selected profile(s)
 				# Get the selected profiles
 				if ($RecentProfilesCheckBox.Checked -eq $true) {
-					$Arguments = "`"$Destination`" $ScanStateConfig /o /vsc $UsersToExclude /uel:$($RecentProfilesDaysTextBox.Text) $EncryptionSnytax $Uncompressed $Logs $ContinueCommand "
+					$Arguments = "`"$Destination`" $ScanStateConfig /o /vsc $UsersToExclude /uel:$($RecentProfilesDaysTextBox.Text) $EncryptionSnytax $Uncompressed $Logs $EFSSyntax $ContinueCommand"
 				} else {
 					$UsersToInclude += $Script:SelectedProfile | ForEach-Object { "`"/ui:$($_.Domain)\$($_.UserName)`"" }
-					$Arguments = "`"$Destination`" $ScanStateConfig /o /vsc /ue:* $UsersToExclude $UsersToInclude $EncryptionSnytax $Uncompressed $Logs $ContinueCommand "
+					$Arguments = "`"$Destination`" $ScanStateConfig /o /vsc /ue:* $UsersToExclude $UsersToInclude $EncryptionSnytax $Uncompressed $Logs $EFSSyntax $ContinueCommand "
 				}
 
 				# Begin saving user state to new computer
@@ -786,6 +797,9 @@ $WallpapersXML
             $DecryptionSyntax = ""
 			# Determine if Encryption has been requested
 			if ($Script:EncryptionPasswordSet -eq $True){
+                #Disable Compression
+                $Script:UncompressedSource = $false
+                $Uncompressed = ''
 				# Set the syntax for the encryption
 				$DecryptionKey = """$Script:EncryptionPassword"""
 				$DecryptionSnytax = "/decrypt /key:$DecryptionKey"
