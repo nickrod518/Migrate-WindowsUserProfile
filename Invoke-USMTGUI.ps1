@@ -1,15 +1,14 @@
 ﻿<#
 .SYNOPSIS
-    Migrate user state from one PC to another using USMT.
+Migrate user state from one PC to another using USMT.
 
 .DESCRIPTION
-    Migrate user state from one PC to another using USMT. Intended for domain joined computers.
-    By default, all user profile data except Favorites and Documents will be included.
-    Tool also allows for user to specify additional folders to include.
+Migrate user state from one PC to another using USMT. Intended for domain joined computers.
+By default, all user profile data except Favorites and Documents will be included.
+Tool also allows for user to specify additional folders to include.
 
 .NOTES
-    USMT environmental variables: https://technet.microsoft.com/en-us/library/cc749104(v=ws.10).aspx
-
+USMT environmental variables: https://technet.microsoft.com/en-us/library/cc749104(v=ws.10).aspx
 #>
 
 begin {
@@ -17,7 +16,7 @@ begin {
     ####### Begin Environment configuration #######
 	
 	# Define the script version
-	$ScriptVersion = "3.2"
+	$ScriptVersion = "3.3"
 
     # Set ScripRoot variable to the path which the script is executed from
     $ScriptRoot = if ($PSVersionTable.PSVersion.Major -lt 3) {
@@ -29,8 +28,8 @@ begin {
     # Load the options in the Config file
 	. "$ScriptRoot\Config.ps1"
 
-    #Set a value for the wscript comobject
-    $WScriptShell = new-object -comobject wscript.shell 
+    # Set a value for the wscript comobject
+    $WScriptShell = New-Object -ComObject wscript.shell 
 
     ####### End Environment configuration #######
 
@@ -53,12 +52,6 @@ begin {
     }
 
     function Get-IPAddress { (Test-Connection -ComputerName (hostname) -Count 1).IPV4Address.IPAddressToString }
-
-    # Get the host name the script is running from
-    function Get-HostName { $env:COMPUTERNAME }
-
-    # Get the user's name that ran this script
-    function Get-CurrentUserName { $env:USERNAME }
 
     function Get-UserProfileLastLogin {
         param(
@@ -797,7 +790,7 @@ $WallpapersXML
             $DecryptionSyntax = ""
 			# Determine if Encryption has been requested
 			if ($Script:EncryptionPasswordSet -eq $True){
-                #Disable Compression
+                # Disable Compression
                 $Script:UncompressedSource = $false
                 $Uncompressed = ''
 				# Set the syntax for the encryption
@@ -828,7 +821,7 @@ $WallpapersXML
         } else {
             $Uncompressed = ''
         }
-        
+
         # Options for creating local accounts that don't already exist on new computer
         $LocalAccountOptions = ''
         if ($Script:DefaultLACreate -eq $true) {
@@ -852,9 +845,11 @@ $WallpapersXML
             }
 
             Update-Log "$OldUser will be migrated as $NewUser."
-            $Arguments = "`"$Destination`" $LoadStateConfig $LocalAccountOptions `"/mu:$($OldUser):$NewUser`" $DecryptionSnytax $Uncompressed $Logs $ContinueCommand"
+            $Arguments = "`"$Destination`" $LoadStateConfig $LocalAccountOptions `"/mu:$($OldUser):$NewUser`" `
+                $DecryptionSnytax $Uncompressed $Logs $ContinueCommand /v:$Script:VerboseLevel"
         } else {
-            $Arguments = "`"$Destination`" $LoadStateConfig $LocalAccountOptions $DecryptionSnytax $Uncompressed $Logs $ContinueCommand"
+            $Arguments = "`"$Destination`" $LoadStateConfig $LocalAccountOptions `
+                $DecryptionSnytax $Uncompressed $Logs $ContinueCommand /v:$Script:VerboseLevel"
         }
 
         # Begin loading user state to this computer
@@ -891,21 +886,21 @@ $WallpapersXML
             }
 
             if ($USMTLoadState.ExitCode -eq 0){
-            Update-Log "Complete!" -Color 'Green'
-            # Delete the save state data
-          
+                Update-Log "Complete!" -Color 'Green'
+
+                # Delete the save state data
                 try {
                     Get-ChildItem $MigrationStorePath | Remove-Item -Recurse
                     Update-Log 'Successfully removed old save state data.'
                 } catch {
                     Update-Log 'There was an issue when trying to remove old save state data.'
                 }
-            } ELSE {
+            } else {
                 update-log 'There was an issue during the loadstate process, please review the results. The state data was not deleted.'
             }
-            } catch {
-                Update-Log $_.Exception.Message -Color 'Red'
-                    }
+        } catch {
+            Update-Log $_.Exception.Message -Color 'Red'
+        }
     }
 
     function Test-ComputerConnection {
@@ -1030,11 +1025,10 @@ $WallpapersXML
         }
     }
 
-    function PasswordPrompt
-    {
-        #Set the password set flag to false.
+    function Read-Password {
+        # Set the password set flag to false.
         $Script:EncryptionPasswordSet = $Null
-        #Clear the password reset flag.
+        # Clear the password reset flag.
         $Script:EncryptionPasswordRetry = $Null
     
         # Prompt the user for an encryption password.
@@ -1050,34 +1044,38 @@ $WallpapersXML
                 [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Script:EncryptionPassword.Password))
         }
 
-        if ($Script:EncryptionPasswordConfirm.Password){
+        if ($Script:EncryptionPasswordConfirm.Password) {
             $Script:EncryptionPasswordConfirm = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
                 [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Script:EncryptionPasswordConfirm.Password))
         }
 
         # Compare the password strings and verify that they match
-        if ($Script:EncryptionPassword -NE $Script:EncryptionPasswordConfirm -or $Script:EncryptionPassword -eq "" -or $Script:EncryptionPassword -eq $Null){
+        if ($Script:EncryptionPassword -ne $Script:EncryptionPasswordConfirm -or 
+            $Script:EncryptionPassword -eq "" -or 
+            $Script:EncryptionPassword -eq $Null) {
                 Update-Log "Password did not match or was blank." -Color 'Yellow'
-        } ELSE {
-            #Set a flag that the password was successfully set
+        } else {
+            # Set a flag that the password was successfully set
             $Script:EncryptionPasswordSet = $True
         }
 
         # Prompt the user to try again if the strings did not match.
-        if ($Script:EncryptionPasswordSet -NE $True -and $Script:EncryptionPasswordRetry -NE "7"){
+        if ($Script:EncryptionPasswordSet -ne $True -and $Script:EncryptionPasswordRetry -ne '7') {
             do {
-                $Script:EncryptionPasswordRetry = $WScriptShell.popup(
-                "Encryption password was not successfully set, try again?", ` 
-                0,"Retry Password",4)
+                $Script:EncryptionPasswordRetry = $WScriptShell.Popup(
+                    'Encryption password was not successfully set, try again?',
+                    0,
+                    'Retry Password',
+                    4
+                )
 
-                #Prompt again if the user opted to retry
-                if ($Script:EncryptionPasswordRetry -NE "7"){
-                     Update-Log "Retrying password prompt." -Color 'Yellow'
-                    PasswordPrompt
+                # Prompt again if the user opted to retry
+                if ($Script:EncryptionPasswordRetry -ne '7'){
+                    Update-Log 'Retrying password prompt.' -Color Yellow
+                    Read-Password
                 }
 
-            }
-            while ($Script:EncryptionPasswordSet -NE $True -and $Script:EncryptionPasswordRetry -NE "7")
+            } while ($Script:EncryptionPasswordSet -ne $True -and $Script:EncryptionPasswordRetry -ne '7')
         }
 
     }
@@ -1182,7 +1180,7 @@ process {
     $OldComputerNameTextBox_OldPage.ReadOnly = $true
     $OldComputerNameTextBox_OldPage.Location = New-Object System.Drawing.Size(100, 34) 
     $OldComputerNameTextBox_OldPage.Size = New-Object System.Drawing.Size(120, 20)
-    $OldComputerNameTextBox_OldPage.Text = Get-HostName
+    $OldComputerNameTextBox_OldPage.Text = $env:COMPUTERNAME
     $OldComputerInfoGroupBox.Controls.Add($OldComputerNameTextBox_OldPage)
 
     # Old Computer IP text box
@@ -1660,7 +1658,7 @@ process {
         if ($ScanStateEncryptionCheckBox.Checked -eq $true) {
             # Prompt for Encryption password
             Update-Log 'Encryption for save state enabled, prompting for password.' -Color 'Yellow'
-            PasswordPrompt
+            Read-Password
             #Disable the use of the encryption password was not sucessfully set.
             if ($Script:EncryptionPasswordSet -NE $True){
                 Update-Log "Encryption password was not set." -Color 'Yellow'
@@ -1814,7 +1812,7 @@ process {
     $NewComputerNameTextBox_NewPage.ReadOnly = $true
     $NewComputerNameTextBox_NewPage.Location = New-Object System.Drawing.Size(100, 56)
     $NewComputerNameTextBox_NewPage.Size = New-Object System.Drawing.Size(120, 20)
-    $NewComputerNameTextBox_NewPage.Text = Get-HostName
+    $NewComputerNameTextBox_NewPage.Text = $env:COMPUTERNAME
     $NewComputerInfoGroupBox.Controls.Add($NewComputerNameTextBox_NewPage)
 
     # New Computer IP text box
@@ -1952,10 +1950,10 @@ process {
         if ($LoadStateEncryptionCheckBox.Checked -eq $true) {
             # Prompt for Encryption password
             Update-Log 'Encryption for load state enabled, prompting for password.' -Color 'Yellow'
-            PasswordPrompt
-            #Disable the use of the encryption password was not sucessfully set.
+            Read-Password
+            # Disable the use of the encryption password was not sucessfully set.
             if ($Script:EncryptionPasswordSet -NE $True){
-                Update-Log "Encryption password was not set." -Color 'Yellow'
+                Update-Log 'Encryption password was not set.' -Color 'Yellow'
                 $LoadStateEncryptionCheckBox.Checked = $false
             } else {
                 Update-Log 'Encyption password successfully set.' -Color 'LightBlue'

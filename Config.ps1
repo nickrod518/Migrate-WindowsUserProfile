@@ -47,10 +47,21 @@ if ((Get-WmiObject Win32_OperatingSystem).OSArchitecture -eq '64-bit') {
     $USMTPath = "$ScriptRoot\USMT\x86"
 }
 
-# Define whether to continue on errors such as file allready exists during restore or read issue during capture.
+# Define whether to continue on errors such as file already exists during restore or read issue during capture.
 $ContinueOnError = $True
 
-#Define how to handle EFS format files. Options are abort (default behaviour), skip, decryptcopy, copyraw
+<# Define the level of verbosity for the USMT scan/load commands
+0 Only the default errors and warnings are enabled.
+1 Enables verbose output.
+4 Enables error and status output.
+5 Enables verbose and status output.
+8 Enables error output to a debugger.
+9 Enables verbose output to a debugger.
+12 Enables error and status output to a debugger.
+13 Enables verbose, status, and debugger output. #>
+$VerboseLevel = 13
+
+# Define how to handle EFS format files. Options are abort (default behaviour), skip, decryptcopy, copyraw
 $EFSHandling = "abort"
 
 # Users to additionially send every migration result to
