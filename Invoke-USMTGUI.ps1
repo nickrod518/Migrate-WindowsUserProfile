@@ -482,9 +482,15 @@ $WallpapersXML
                 Update-Log "Emailing migration results to: $EmailRecipients"
 
                 try {
-                    Send-MailMessage -From $EmailSenderTextBox.Text -To $EmailRecipients `
-                        -Subject $EmailSubject -Body $LogTextBox.Text -SmtpServer $SMTPServerTextBox.Text `
-                        -Attachments "$Destination\$ActionType.log"
+                    $SendMailMessageParams = @{
+                        From = $EmailSenderTextBox.Text
+                        To = $EmailRecipients
+                        Subject = $EmailSubject
+                        Body = $LogTextBox.Text
+                        SmtpServer = $SMTPServerTextBox.Text
+                        Attachments = "$Destination\$ActionType.log"
+                    }
+                    Send-MailMessage @$SendMailMessageParams
                 } catch {
                     Update-Log "Error occurred sending email: $($_.Exception.Message)" -Color 'Red'
                 }
@@ -548,12 +554,24 @@ $WallpapersXML
 
         Update-Log "`nBeginning migration..."
 
+        # Run scripts before doing actual data migration
+        $OldComputerScriptsDataGridView.Rows | ForEach-Object {
+            $ScriptName = $OldComputerScriptsDataGridView.Item(0, $_.Index).Value
+            $ScriptPath = "$PSScriptRoot\Scripts\OldComputer\$ScriptName"
+            Update-Log "Running $ScriptPath"
+            if (-not $Debug) { Update-Log (& $ScriptPath *>&1 | Out-String) }
+        }
+
         # If we're saving locally, skip network stuff
         if ($SaveRemotelyCheckBox.Checked) {
             # If connection hasn't been verfied, test now
             if (-not $ConnectionCheckBox_OldPage.Checked) {
-                Test-ComputerConnection -ComputerNameTextBox $NewComputerNameTextBox_OldPage `
-                -ComputerIPTextBox $NewComputerIPTextBox_OldPage -ConnectionCheckBox $ConnectionCheckBox_OldPage
+                $TestComputerConnectionParams = @{
+                    ComputerNameTextBox = $NewComputerNameTextBox_OldPage
+                    ComputerIPTextBox = $NewComputerIPTextBox_OldPage
+                    ConnectionCheckBox = $ConnectionCheckBox_OldPage
+                }
+                Test-ComputerConnection @TestComputerConnectionParams
             }
 
             # Try and use the IP if the user filled that out, otherwise use the name
@@ -732,12 +750,24 @@ $WallpapersXML
 
         Update-Log "`nBeginning migration..."
 
+        # Run scripts before doing actual data migration
+        $NewComputerScriptsDataGridView.Rows | ForEach-Object {
+            $ScriptName = $NewComputerScriptsDataGridView.Item(0, $_.Index).Value
+            $ScriptPath = "$PSScriptRoot\Scripts\NewComputer\$ScriptName"
+            Update-Log "Running $ScriptPath"
+            if (-not $Debug) { Update-Log (& $ScriptPath *>&1 | Out-String) }
+        }
+
         # If override is enabled, skip network checks
         if (-not $OverrideCheckBox.Checked) {
             # If connection hasn't been verfied, test now
             if (-not $ConnectionCheckBox_NewPage.Checked) {
-                Test-ComputerConnection -ComputerNameTextBox $OldComputerNameTextBox_NewPage `
-                -ComputerIPTextBox $OldComputerIPTextBox_NewPage -ConnectionCheckBox $ConnectionCheckBox_NewPage
+                $TestComputerConnectionParams = @{
+                    ComputerNameTextBox = $OldComputerNameTextBox_NewPage
+                    ComputerIPTextBox = $OldComputerIPTextBox_NewPage
+                    ConnectionCheckBox = $ConnectionCheckBox_NewPage
+                }
+                Test-ComputerConnection @TestComputerConnectionParams
             }
 
             # Try and use the IP if the user filled that out, otherwise use the name
@@ -1005,9 +1035,15 @@ $WallpapersXML
             Update-Log "Sending test email to: $EmailRecipients"
 
             try {
-                Send-MailMessage -From $EmailSenderTextBox.Text -To $EmailRecipients `
-                    -Subject $EmailSubject -Body $LogTextBox.Text -SmtpServer $SMTPServerTextBox.Text `
-                    -ErrorAction Stop
+                $SendMailMessageParams = @{
+                    From = $EmailSenderTextBox.Text
+                    To = $EmailRecipients
+                    Subject = $EmailSubject
+                    Body = $LogTextBox.Text
+                    SmtpServer = $SMTPServerTextBox.Text
+                    ErrorAction = Stop
+                }
+                Send-MailMessage @$SendMailMessageParams
             } catch {
                 Update-Log "Error occurred sending email: $($_.Exception.Message)" -Color 'Red'
             }
@@ -1214,8 +1250,12 @@ process {
     $TestConnectionButton_OldPage.Size = New-Object System.Drawing.Size(100, 22)
     $TestConnectionButton_OldPage.Text = 'Test Connection'
     $TestConnectionButton_OldPage.Add_Click({
-        Test-ComputerConnection -ComputerNameTextBox $NewComputerNameTextBox_OldPage `
-        -ComputerIPTextBox $NewComputerIPTextBox_OldPage -ConnectionCheckBox $ConnectionCheckBox_OldPage
+        $TestComputerConnectionParams = @{
+            ComputerNameTextBox = $NewComputerNameTextBox_OldPage
+            ComputerIPTextBox = $NewComputerIPTextBox_OldPage
+            ConnectionCheckBox = $ConnectionCheckBox_OldPage
+        }
+        Test-ComputerConnection @TestComputerConnectionParams
     })
     $OldComputerInfoGroupBox.Controls.Add($TestConnectionButton_OldPage)
 
@@ -1815,8 +1855,12 @@ process {
     $TestConnectionButton_NewPage.Size = New-Object System.Drawing.Size(100, 22)
     $TestConnectionButton_NewPage.Text = 'Test Connection'
     $TestConnectionButton_NewPage.Add_Click({
-        Test-ComputerConnection -ComputerNameTextBox $OldComputerNameTextBox_NewPage `
-        -ComputerIPTextBox $OldComputerIPTextBox_NewPage -ConnectionCheckBox $ConnectionCheckBox_NewPage          
+        $TestComputerConnectionParams = @{
+            ComputerNameTextBox = $OldComputerNameTextBox_NewPage
+            ComputerIPTextBox = $OldComputerIPTextBox_NewPage
+            ConnectionCheckBox = $ConnectionCheckBox_NewPage 
+        }
+        Test-ComputerConnection @TestComputerConnectionParams
     })
     $NewComputerInfoGroupBox.Controls.Add($TestConnectionButton_NewPage)
 
@@ -2112,6 +2156,97 @@ process {
     $TestEmailButton.Text = 'Test Email'
     $TestEmailButton.Add_Click({ Test-Email })
     $EmailSettingsTabPage.Controls.Add($TestEmailButton)
+
+    # Create scripts tab
+    $ScriptsTabPage = New-Object System.Windows.Forms.TabPage
+    $ScriptsTabPage.DataBindings.DefaultDataSourceUpdateMode = 0
+    $ScriptsTabPage.UseVisualStyleBackColor = $true
+    $ScriptsTabPage.Text = 'Scripts'
+    $TabControl.Controls.Add($ScriptsTabPage)
+
+    # Old computer scripts selection group box
+    $OldComputerScriptsGroupBox = New-Object System.Windows.Forms.GroupBox
+    $OldComputerScriptsGroupBox.Location = New-Object System.Drawing.Size(10, 10)
+    $OldComputerScriptsGroupBox.Size = New-Object System.Drawing.Size(450, 220)
+    $OldComputerScriptsGroupBox.Text = 'Old Computer Scripts'
+    $ScriptsTabPage.Controls.Add($OldComputerScriptsGroupBox)
+    
+    # Old computer scripts data table
+    $OldComputerScriptsDataGridView = New-Object System.Windows.Forms.DataGridView
+    $OldComputerScriptsDataGridView.Location = New-Object System.Drawing.Size(5, 20)
+    $OldComputerScriptsDataGridView.Size = New-Object System.Drawing.Size(440, 190)
+    $OldComputerScriptsDataGridView.ReadOnly = $true
+    $OldComputerScriptsDataGridView.AllowUserToAddRows = $false
+    $OldComputerScriptsDataGridView.AllowUserToResizeRows = $false
+    $OldComputerScriptsDataGridView.AllowUserToResizeColumns = $false
+    $OldComputerScriptsDataGridView.MultiSelect = $false
+    $OldComputerScriptsDataGridView.ColumnCount = 1
+    $OldComputerScriptsDataGridView.AutoSizeColumnsMode = 'Fill'
+    $OldComputerScriptsDataGridView.ColumnHeadersVisible = $false
+    $OldComputerScriptsDataGridView.RowHeadersVisible = $false
+    $OldComputerScriptsGroupBox.Controls.Add($OldComputerScriptsDataGridView)
+
+    # Add old computer script to data grid view
+    foreach ($Script in (Get-ChildItem -Path "$PSScriptRoot\Scripts\OldComputer" -File)) {
+        $OldComputerScriptsDataGridView.Rows.Add($Script)
+    }
+
+    # Remove old computer script button
+    $RemoveOldComputerScriptButton = New-Object System.Windows.Forms.Button
+    $RemoveOldComputerScriptButton.Location = New-Object System.Drawing.Size(0, 170)
+    $RemoveOldComputerScriptButton.Size = New-Object System.Drawing.Size(20, 20)
+    $RemoveOldComputerScriptButton.Text = '-'
+    $RemoveOldComputerScriptButton.Font = 'Consolas, 14'
+    $RemoveOldComputerScriptButton.Add_Click({
+        # Remove selected cell from new computer scripts data grid view
+        $CurrentCell = $NewComputerScriptsDataGridView.CurrentCell
+        Update-Log "Removed [$($CurrentCell.Value)] from old computer scripts."
+        $CurrentRow = $NewComputerScriptsDataGridView.Rows[$CurrentCell.RowIndex]
+        $NewComputerScriptsDataGridView.Rows.Remove($CurrentRow)
+    })
+    $OldComputerScriptsDataGridView.Controls.Add($RemoveOldComputerScriptButton)
+
+    # New computer scripts selection group box
+    $NewComputerScriptsGroupBox = New-Object System.Windows.Forms.GroupBox
+    $NewComputerScriptsGroupBox.Location = New-Object System.Drawing.Size(10, 240)
+    $NewComputerScriptsGroupBox.Size = New-Object System.Drawing.Size(450, 220)
+    $NewComputerScriptsGroupBox.Text = 'New Computer Scripts'
+    $ScriptsTabPage.Controls.Add($NewComputerScriptsGroupBox)
+    
+    # New computer scripts data table
+    $NewComputerScriptsDataGridView = New-Object System.Windows.Forms.DataGridView
+    $NewComputerScriptsDataGridView.Location = New-Object System.Drawing.Size(5, 20)
+    $NewComputerScriptsDataGridView.Size = New-Object System.Drawing.Size(440, 190)
+    $NewComputerScriptsDataGridView.ReadOnly = $true
+    $NewComputerScriptsDataGridView.AllowUserToAddRows = $false
+    $NewComputerScriptsDataGridView.AllowUserToResizeRows = $false
+    $NewComputerScriptsDataGridView.AllowUserToResizeColumns = $false
+    $NewComputerScriptsDataGridView.MultiSelect = $false
+    $NewComputerScriptsDataGridView.ColumnCount = 1
+    $NewComputerScriptsDataGridView.AutoSizeColumnsMode = 'Fill'
+    $NewComputerScriptsDataGridView.ColumnHeadersVisible = $false
+    $NewComputerScriptsDataGridView.RowHeadersVisible = $false
+    $NewComputerScriptsGroupBox.Controls.Add($NewComputerScriptsDataGridView)
+
+    # Add new computer script to data grid view
+    foreach ($Script in (Get-ChildItem -Path "$PSScriptRoot\Scripts\NewComputer" -File)) {
+        $NewComputerScriptsDataGridView.Rows.Add($Script)
+    }
+
+    # Remove new computer script button
+    $RemoveNewComputerScriptButton = New-Object System.Windows.Forms.Button
+    $RemoveNewComputerScriptButton.Location = New-Object System.Drawing.Size(0, 170)
+    $RemoveNewComputerScriptButton.Size = New-Object System.Drawing.Size(20, 20)
+    $RemoveNewComputerScriptButton.Text = '-'
+    $RemoveNewComputerScriptButton.Font = 'Consolas, 14'
+    $RemoveNewComputerScriptButton.Add_Click({
+        # Remove selected cell from new computer scripts data grid view
+        $CurrentCell = $NewComputerScriptsDataGridView.CurrentCell
+        Update-Log "Removed [$($CurrentCell.Value)] from new computer scripts."
+        $CurrentRow = $NewComputerScriptsDataGridView.Rows[$CurrentCell.RowIndex]
+        $NewComputerScriptsDataGridView.Rows.Remove($CurrentRow)
+    })
+    $NewComputerScriptsDataGridView.Controls.Add($RemoveNewComputerScriptButton)
 
     # Debug button
     $DebugLabel = New-Object System.Windows.Forms.Label

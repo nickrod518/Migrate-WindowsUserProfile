@@ -6,6 +6,8 @@ This requires that the USMT binaries are already present on the machine or a net
 
 Review the Config.ps1 file and make any changes to fit your needs.
 
+I recommend using my Create-EXEFromPS1 (https://github.com/nickrod518/Create-EXEFromPS1) to package the prepped migration tool for portability and ease of use.
+
 ## Output
 You can specify the path that you want the logs and migration files to save to in the config file using the $MigrationStorePath variable (the default location is C:\TEMP\MigrationStore). You will see the load and scan state logs in that same folder named scan_progress.log and load_progress.log respectively. If you enter a new computer name the migration data will be saved on the new computer in the $MigrationStorePath directory in a folder with the same name as the old computer. You can change this location on the Old Computer tab in the Save State Destination section.
 
