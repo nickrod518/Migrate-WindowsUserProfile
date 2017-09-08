@@ -19,3 +19,6 @@ You can specify the path that you want the logs and migration files to save to i
 
 ## Email Settings tab options
 ![alt EmailSettings](https://github.com/nickrod518/Migrate-WindowsUserProfile/blob/master/images/EmailSettings.png)
+
+## Scripts Settings tab options
+![alt ScriptsSettings](https://github.com/nickrod518/Migrate-WindowsUserProfile/blob/master/images/ScriptsSettings.png)
