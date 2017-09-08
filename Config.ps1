@@ -5,7 +5,7 @@ $DefaultDomain = 'DOMAIN'
 
 # Default accounts to exclude from migration in the form of "Domain\UserName"
 $DefaultExcludeProfile = @(
-    "$ENV:Computername\default*",
+    "$env:COMPUTERNAME\default*",
     "NT Service\*"
 )
 

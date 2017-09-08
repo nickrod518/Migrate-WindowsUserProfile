@@ -12,11 +12,8 @@ USMT environmental variables: https://technet.microsoft.com/en-us/library/cc7491
 #>
 
 begin {
-
-    ####### Begin Environment configuration #######
-	
 	# Define the script version
-	$ScriptVersion = "3.3"
+	$ScriptVersion = "3.3.1"
 
     # Set ScripRoot variable to the path which the script is executed from
     $ScriptRoot = if ($PSVersionTable.PSVersion.Major -lt 3) {
@@ -30,10 +27,6 @@ begin {
 
     # Set a value for the wscript comobject
     $WScriptShell = New-Object -ComObject wscript.shell 
-
-    ####### End Environment configuration #######
-
-    ####### Begin Functions #######
 
     function Update-Log {
         param(
@@ -626,7 +619,7 @@ $WallpapersXML
 				}
 
 				# Clear encryption syntax in case it's already defined.
-				$EncryptionSnytax = ""
+				$EncryptionSyntax = ""
 				# Determine if Encryption has been requested
 				if ($Script:EncryptionPasswordSet -eq $True){
                     #Disable Compression
@@ -634,7 +627,7 @@ $WallpapersXML
                     $Uncompressed = ''
 					# Set the syntax for the encryption
 					$EncryptionKey = """$Script:EncryptionPassword"""
-					$EncryptionSnytax = "/encrypt /key:$EncryptionKey"
+					$EncryptionSyntax = "/encrypt /key:$EncryptionKey"
 				}
 				
 				#Set the value to continue on error if it was specified above
@@ -689,10 +682,10 @@ $WallpapersXML
 				# Overwrite existing save state, use volume shadow copy method, exclude all but the selected profile(s)
 				# Get the selected profiles
 				if ($RecentProfilesCheckBox.Checked -eq $true) {
-					$Arguments = "`"$Destination`" $ScanStateConfig /o /vsc $UsersToExclude /uel:$($RecentProfilesDaysTextBox.Text) $EncryptionSnytax $Uncompressed $Logs $EFSSyntax $ContinueCommand"
+					$Arguments = "`"$Destination`" $ScanStateConfig /o /vsc $UsersToExclude /uel:$($RecentProfilesDaysTextBox.Text) $EncryptionSyntax $Uncompressed $Logs $EFSSyntax $ContinueCommand"
 				} else {
 					$UsersToInclude += $Script:SelectedProfile | ForEach-Object { "`"/ui:$($_.Domain)\$($_.UserName)`"" }
-					$Arguments = "`"$Destination`" $ScanStateConfig /o /vsc /ue:* $UsersToExclude $UsersToInclude $EncryptionSnytax $Uncompressed $Logs $EFSSyntax $ContinueCommand "
+					$Arguments = "`"$Destination`" $ScanStateConfig /o /vsc /ue:* $UsersToExclude $UsersToInclude $EncryptionSyntax $Uncompressed $Logs $EFSSyntax $ContinueCommand "
 				}
 
 				# Begin saving user state to new computer
@@ -732,7 +725,7 @@ $WallpapersXML
         }
     }
 
-    function Load-UserState {
+    function Restore-UserState {
         param(
             [switch] $Debug
         )
@@ -1075,9 +1068,7 @@ $WallpapersXML
 
             } while ($Script:EncryptionPasswordSet -ne $True -and $Script:EncryptionPasswordRetry -ne '7')
         }
-
     }
-
 
     # Hide parent PowerShell window unless run from ISE
     if (-not $(Test-IsISE)) {
@@ -1094,9 +1085,6 @@ public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
 
     $Script:Destination = ''
 }
-
-####### End Functions #######
-
 
 process {
     # Create form
@@ -1960,8 +1948,6 @@ process {
     })
     $NewComputerTabPage.Controls.Add($LoadStateEncryptionCheckBox)
 
-
-
     Show-DomainInfo
 
     # Migrate button
@@ -1970,7 +1956,7 @@ process {
     $MigrateButton_NewPage.Size = New-Object System.Drawing.Size(100, 40)
     $MigrateButton_NewPage.Font = New-Object System.Drawing.Font('Calibri', 16, [System.Drawing.FontStyle]::Bold)
     $MigrateButton_NewPage.Text = 'Migrate'
-    $MigrateButton_NewPage.Add_Click({ Load-UserState })
+    $MigrateButton_NewPage.Add_Click({ Restore-UserState })
     $NewComputerTabPage.Controls.Add($MigrateButton_NewPage)
 
     # Create email settings tab
@@ -2136,7 +2122,7 @@ process {
         if ($TabControl.SelectedIndex -eq 0) {
             Save-UserState -Debug
         } elseif ($TabControl.SelectedIndex -eq 1) {
-            Load-UserState -Debug
+            Restore-UserState -Debug
         }
     })
     $Form.Controls.Add($DebugLabel)
