@@ -2187,9 +2187,9 @@ process {
     $OldComputerScriptsGroupBox.Controls.Add($OldComputerScriptsDataGridView)
 
     # Add old computer script to data grid view
-    $NewComputerScripts = Get-ChildItem -Path "$PSScriptRoot\Scripts\OldComputer" |
+    $OldComputerScripts = Get-ChildItem -Path "$PSScriptRoot\Scripts\OldComputer" |
         Where-Object { -not $_.PSIsContainer }
-    foreach ($Script in $NewComputerScripts) {
+    foreach ($Script in $OldComputerScripts) {
         $OldComputerScriptsDataGridView.Rows.Add($Script)
     }
 
@@ -2231,9 +2231,9 @@ process {
     $NewComputerScriptsGroupBox.Controls.Add($NewComputerScriptsDataGridView)
 
     # Add new computer script to data grid view
-    $OldComputerScripts = Get-ChildItem -Path "$PSScriptRoot\Scripts\OldComputer" |
+    $NewComputerScripts = Get-ChildItem -Path "$PSScriptRoot\Scripts\NewComputer" |
         Where-Object { -not $_.PSIsContainer }
-    foreach ($Script in $OldComputerScripts) {
+    foreach ($Script in $NewComputerScripts) {
         $NewComputerScriptsDataGridView.Rows.Add($Script)
     }
 
