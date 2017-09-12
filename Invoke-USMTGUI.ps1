@@ -13,7 +13,7 @@ USMT environmental variables: https://technet.microsoft.com/en-us/library/cc7491
 
 begin {
 	# Define the script version
-	$ScriptVersion = "3.3.1"
+	$ScriptVersion = "3.3.2"
 
     # Set ScripRoot variable to the path which the script is executed from
     $ScriptRoot = if ($PSVersionTable.PSVersion.Major -lt 3) {
@@ -490,7 +490,7 @@ $WallpapersXML
                         SmtpServer = $SMTPServerTextBox.Text
                         Attachments = "$Destination\$ActionType.log"
                     }
-                    Send-MailMessage @$SendMailMessageParams
+                    Send-MailMessage @SendMailMessageParams
                 } catch {
                     Update-Log "Error occurred sending email: $($_.Exception.Message)" -Color 'Red'
                 }
@@ -559,7 +559,7 @@ $WallpapersXML
             $ScriptName = $OldComputerScriptsDataGridView.Item(0, $_.Index).Value
             $ScriptPath = "$PSScriptRoot\Scripts\OldComputer\$ScriptName"
             Update-Log "Running $ScriptPath"
-            if (-not $Debug) { Update-Log (& $ScriptPath *>&1 | Out-String) }
+            if (-not $Debug) { Update-Log (Start-Process $ScriptPath -Wait -PassThru | Out-String) }
         }
 
         # If we're saving locally, skip network stuff
@@ -755,7 +755,7 @@ $WallpapersXML
             $ScriptName = $NewComputerScriptsDataGridView.Item(0, $_.Index).Value
             $ScriptPath = "$PSScriptRoot\Scripts\NewComputer\$ScriptName"
             Update-Log "Running $ScriptPath"
-            if (-not $Debug) { Update-Log (& $ScriptPath *>&1 | Out-String) }
+            if (-not $Debug) { Update-Log (Start-Process $ScriptPath -Wait -PassThru | Out-String) }
         }
 
         # If override is enabled, skip network checks
@@ -1043,7 +1043,7 @@ $WallpapersXML
                     SmtpServer = $SMTPServerTextBox.Text
                     ErrorAction = Stop
                 }
-                Send-MailMessage @$SendMailMessageParams
+                Send-MailMessage @SendMailMessageParams
             } catch {
                 Update-Log "Error occurred sending email: $($_.Exception.Message)" -Color 'Red'
             }
@@ -2187,7 +2187,9 @@ process {
     $OldComputerScriptsGroupBox.Controls.Add($OldComputerScriptsDataGridView)
 
     # Add old computer script to data grid view
-    foreach ($Script in (Get-ChildItem -Path "$PSScriptRoot\Scripts\OldComputer" -File)) {
+    $NewComputerScripts = Get-ChildItem -Path "$PSScriptRoot\Scripts\OldComputer" |
+        Where-Object { -not $_.PSIsContainer }
+    foreach ($Script in $NewComputerScripts) {
         $OldComputerScriptsDataGridView.Rows.Add($Script)
     }
 
@@ -2229,7 +2231,9 @@ process {
     $NewComputerScriptsGroupBox.Controls.Add($NewComputerScriptsDataGridView)
 
     # Add new computer script to data grid view
-    foreach ($Script in (Get-ChildItem -Path "$PSScriptRoot\Scripts\NewComputer" -File)) {
+    $OldComputerScripts = Get-ChildItem -Path "$PSScriptRoot\Scripts\OldComputer" |
+        Where-Object { -not $_.PSIsContainer }
+    foreach ($Script in $OldComputerScripts) {
         $NewComputerScriptsDataGridView.Rows.Add($Script)
     }
 
