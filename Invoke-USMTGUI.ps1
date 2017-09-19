@@ -1285,7 +1285,7 @@ process {
     $SelectProfileGroupBox = New-Object System.Windows.Forms.GroupBox
     $SelectProfileGroupBox.Location = New-Object System.Drawing.Size(240, 220)
     $SelectProfileGroupBox.Size = New-Object System.Drawing.Size(220, 100)
-    $SelectProfileGroupBox.Text = 'Save State Destination'
+    $SelectProfileGroupBox.Text = 'Profile Selection'
     $OldComputerTabPage.Controls.Add($SelectProfileGroupBox)
 
     # Select profile(s) button
