@@ -13,7 +13,7 @@ USMT environmental variables: https://technet.microsoft.com/en-us/library/cc7491
 
 begin {
 	# Define the script version
-	$ScriptVersion = "3.3.2"
+	$ScriptVersion = "3.3.3"
 
     # Set ScripRoot variable to the path which the script is executed from
     $ScriptRoot = if ($PSVersionTable.PSVersion.Major -lt 3) {
@@ -121,8 +121,8 @@ begin {
         $UserIdentity = [Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()
 
         if (-not $UserIdentity.IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator')) {
-            Update-Log "You are not running this script with an admin account. " -Color 'Red' -NoNewLine
-            Update-Log "Some tasks may fail if not run with admin credentials.`n" -Color 'Red'
+            Update-Log "You are not running this script as Administrator. " -Color 'Yellow' -NoNewLine
+            Update-Log "Some tasks may fail if launched as Administrator.`n" -Color 'Yellow'
         }
     }
 
@@ -559,7 +559,14 @@ $WallpapersXML
             $ScriptName = $OldComputerScriptsDataGridView.Item(0, $_.Index).Value
             $ScriptPath = "$PSScriptRoot\Scripts\OldComputer\$ScriptName"
             Update-Log "Running $ScriptPath"
-            if (-not $Debug) { Update-Log (Start-Process $ScriptPath -Wait -PassThru | Out-String) }
+            if (-not $Debug) {
+                $Result = if ($ScriptPath.EndsWith('ps1')) {
+                    . $ScriptPath
+                } else {
+                    Start-Process $ScriptPath -Wait -PassThru
+                }
+                Update-Log ($Result | Out-String)
+            }
         }
 
         # If we're saving locally, skip network stuff
@@ -755,7 +762,14 @@ $WallpapersXML
             $ScriptName = $NewComputerScriptsDataGridView.Item(0, $_.Index).Value
             $ScriptPath = "$PSScriptRoot\Scripts\NewComputer\$ScriptName"
             Update-Log "Running $ScriptPath"
-            if (-not $Debug) { Update-Log (Start-Process $ScriptPath -Wait -PassThru | Out-String) }
+            if (-not $Debug) {
+                $Result = if ($ScriptPath.EndsWith('ps1')) {
+                    . $ScriptPath
+                } else {
+                    Start-Process $ScriptPath -Wait -PassThru
+                }
+                Update-Log ($Result | Out-String)
+            }
         }
 
         # If override is enabled, skip network checks
