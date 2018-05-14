@@ -1306,7 +1306,7 @@ process {
     $RecentProfilesDaysTextBox = New-Object System.Windows.Forms.TextBox 
     $RecentProfilesDaysTextBox.Location = New-Object System.Drawing.Size(165, 70) 
     $RecentProfilesDaysTextBox.Size = New-Object System.Drawing.Size(40, 20)
-    $RecentProfilesDaysTextBox.Text = 90
+    $RecentProfilesDaysTextBox.Text = $DefaultRecentProfilesDays
     $SelectProfileGroupBox.Controls.Add($RecentProfilesDaysTextBox)
 
     # Only recent profiles check box
@@ -1314,6 +1314,7 @@ process {
     $RecentProfilesCheckBox.Text = 'Migrate all profiles logged into within this amount of days:'
     $RecentProfilesCheckBox.Location = New-Object System.Drawing.Size(15, 50) 
     $RecentProfilesCheckBox.Size = New-Object System.Drawing.Size(200, 40)
+    $RecentProfilesCheckBox.Checked = $DefaultRecentProfiles
     $RecentProfilesCheckBox.Add_Click({
         if ($RecentProfilesCheckBox.Checked -eq $true) {
             Update-Log "All profiles logged into within the last $($RecentProfilesDaysTextBox.Text) days will be saved."
