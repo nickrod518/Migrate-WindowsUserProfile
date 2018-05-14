@@ -40,6 +40,13 @@ $DefaultIncludeMyMusic = $true
 $DefaultIncludeMyPictures = $true
 $DefaultIncludeMyVideo = $true
 
+# Default extra directories to include
+$DefaultExtraDirectories = @()
+
+# Default recent profiles
+$DefaultRecentProfiles = $true
+$DefaultRecentProfilesDays = 90
+
 # Get USMT binary path according to OS architecture. If you used the zip provided, unzip in the same directory as this script
 if ((Get-WmiObject Win32_OperatingSystem).OSArchitecture -match '64') { 
     $USMTPath = "$ScriptRoot\USMT\amd64"
