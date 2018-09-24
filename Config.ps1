@@ -71,7 +71,7 @@ $VerboseLevel = 13
 # Define how to handle EFS format files. Options are abort (default behaviour), skip, decryptcopy, copyraw
 $EFSHandling = "abort"
 
-# Users to additionially send every migration result to
+# Users to additionally send every migration result to
 $DefaultEmailEnabled = $false
 $DefaultEmailSender = 'MigrationAlert@company.com'
 $DefaultEmailRecipients = @('my.email@company.com')
