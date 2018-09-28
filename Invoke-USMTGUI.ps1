@@ -26,7 +26,7 @@ begin {
 	. "$ScriptRoot\Config.ps1"
 
     # Set a value for the wscript comobject
-    $WScriptShell = New-Object -ComObject wscript.shell 
+    $WScriptShell = New-Object -ComObject wscript.shell
 
     function Update-Log {
         param(
@@ -111,7 +111,7 @@ begin {
             [string]$UserName
         )
 
-        $UserObject = New-Object System.Security.Principal.NTAccount($Domain, $UserName) 
+        $UserObject = New-Object System.Security.Principal.NTAccount($Domain, $UserName)
         $SID = $UserObject.Translate([System.Security.Principal.SecurityIdentifier])
         $User = Get-ItemProperty -Path "Registry::HKey_Local_Machine\Software\Microsoft\Windows NT\CurrentVersion\ProfileList\$($SID.Value)"
         $User.ProfileImagePath
@@ -129,7 +129,7 @@ begin {
     function Set-SaveDirectory {
         param (
             [Parameter(Mandatory = $true)]
-            [ValidateSet('Destination', 'Source')] 
+            [ValidateSet('Destination', 'Source')]
             [string] $Type
         )
 
@@ -224,7 +224,7 @@ begin {
         } else {
             Update-Log 'No extra directories will be included.'
         }
-        
+
         Update-Log 'Data to be included:'
         foreach ($Control in $InclusionsGroupBox.Controls) { if ($Control.Checked) { Update-Log $Control.Text } }
 
@@ -453,7 +453,7 @@ $WallpapersXML
             $Results = Get-Content "$Destination\$ActionType.log" | Out-String
         } else {
             # Get the last 4 lines from the log so we can see the results
-            $Results = Get-Content "$Destination\$ActionType.log" -Tail 4 | ForEach-Object { 
+            $Results = Get-Content "$Destination\$ActionType.log" -Tail 4 | ForEach-Object {
                 ($_.Split(']', 2)[1]).TrimStart()
             } | Out-String
         }
@@ -462,7 +462,7 @@ $WallpapersXML
 
 		if ($ActionType -eq 'load') {
 			Update-Log 'A reboot is recommended.' -Color 'Yellow'
-        
+
             $EmailSubject = "Migration Load Results of $($OldComputerNameTextBox_NewPage.Text) to $($NewComputerNameTextBox_NewPage.Text)"
 		} else {
             $EmailSubject = "Migration Save Results of $($OldComputerNameTextBox_OldPage.Text) to $($NewComputerNameTextBox_OldPage.Text)"
@@ -517,7 +517,7 @@ $WallpapersXML
     function Get-SaveState {
         # Use the migration folder name to get the old computer name
         if (Get-ChildItem $SaveSourceTextBox.Text -ErrorAction SilentlyContinue) {
-            $SaveSource = Get-ChildItem $SaveSourceTextBox.Text | Where-Object { $_.PSIsContainer } | 
+            $SaveSource = Get-ChildItem $SaveSourceTextBox.Text | Where-Object { $_.PSIsContainer } |
                 Sort-Object -Descending -Property { $_.CreationTime } | Select-Object -First 1
             if (Test-Path "$($SaveSource.FullName)\USMT\USMT.MIG") {
                 $Script:UncompressedSource = $false
@@ -630,10 +630,10 @@ $WallpapersXML
 					return
 				}
 			}
-			
+
 			#Verify that the Destination folder is valid.
 			if (Test-Path $Destination){
-			
+
 				# If profile is a domain other than $DefaultDomain, save this info to text file
 				if ($RecentProfilesCheckBox.Checked -eq $false) {
 					$FullUserName = "$($Script:SelectedProfile.Domain)\$($Script:SelectedProfile.UserName)"
@@ -654,7 +654,7 @@ $WallpapersXML
 					$EncryptionKey = """$Script:EncryptionPassword"""
 					$EncryptionSyntax = "/encrypt /key:$EncryptionKey"
 				}
-				
+
 				#Set the value to continue on error if it was specified above
 				if ($ContinueOnError -eq $True){
 					$ContinueCommand  = "/c"
@@ -662,9 +662,9 @@ $WallpapersXML
 				if ($ContinueOnError -eq $False){
 					$ContinueCommand = ""
 				}
-				
-				
-				# Create config syntax for scanstate for custom XMLs.           
+
+
+				# Create config syntax for scanstate for custom XMLs.
 				IF ($SelectedXMLS) {
 					#Create the scanstate syntax line for the config files.
 					foreach ($ConfigXML in $SelectedXMLS) {
@@ -673,8 +673,8 @@ $WallpapersXML
 					 }
 				}
 
-				# Create config syntax for scanstate for generated XML.     
-				IF (!($SelectedXMLS)){ 
+				# Create config syntax for scanstate for generated XML.
+				IF (!($SelectedXMLS)){
 					# Create the scan configuration
 					Update-Log 'Generating configuration file...'
 					$Config = Set-Config
@@ -683,7 +683,7 @@ $WallpapersXML
 				}
 
 				# Generate parameter for logging
-				$Logs = "`"/l:$Destination\scan.log`" `"/progress:$Destination\scan_progress.log`""
+				$Logs = "`"/listfiles:$Destination\FilesMigrated.log`" `"/l:$Destination\scan.log`" `"/progress:$Destination\scan_progress.log`""
 
 				# Set parameter for whether save state is compressed
 				if ($UncompressedCheckBox.Checked -eq $true) {
@@ -697,7 +697,7 @@ $WallpapersXML
 					$ExcludeProfile = """$ExcludeProfile"""
 					$UsersToExclude += "/ue:$ExcludeProfile "
 				}
-				
+
                 # Set the EFS Syntax based on the config.
                 if ($EFSHandling){
                     $EFSSyntax = "/efs:$EFSHandling"
@@ -813,7 +813,7 @@ $WallpapersXML
             Update-Log "User has verified the save state process on $OldComputer is already completed. Proceeding with migration."
         }
 		$OldComputerName = $OldComputerNameTextBox_NewPage.Text
-        
+
         # Get the location of the save state data
         $Script:Destination = "$($SaveSourceTextBox.Text)\$OldComputerName"
 
@@ -822,7 +822,7 @@ $WallpapersXML
             Update-Log "No saved state found at [$Destination]. Migration cancelled." -Color 'Red'
             return
         }
-		
+
             # Clear decryption syntax in case it's already defined.
             $DecryptionSyntax = ""
 			# Determine if Encryption has been requested
@@ -834,7 +834,7 @@ $WallpapersXML
 				$DecryptionKey = """$Script:EncryptionPassword"""
 				$DecryptionSnytax = "/decrypt /key:$DecryptionKey"
 			}
-            
+
             # Set the value to continue on error if it was specified above
             if ($ContinueOnError -eq $True){
                 $ContinueCommand  = "/c"
@@ -892,7 +892,7 @@ $WallpapersXML
         $LogArguments = $Arguments -Replace '/key:".*"','/key:(Hidden)'
         Update-Log "Command used:"
         Update-Log "$LoadState $LogArguments" -Color 'Cyan'
-		
+
 
         # If we're running in debug mode don't actually start the process
         if ($Debug) { return }
@@ -1071,7 +1071,7 @@ $WallpapersXML
         $Script:EncryptionPasswordSet = $Null
         # Clear the password reset flag.
         $Script:EncryptionPasswordRetry = $Null
-    
+
         # Prompt the user for an encryption password.
         $Script:EncryptionPassword = $Null
         $Script:EncryptionPassword = Get-Credential -Message "Enter the encryption password" -UserName "Enter a password Below"
@@ -1091,8 +1091,8 @@ $WallpapersXML
         }
 
         # Compare the password strings and verify that they match
-        if ($Script:EncryptionPassword -ne $Script:EncryptionPasswordConfirm -or 
-            $Script:EncryptionPassword -eq "" -or 
+        if ($Script:EncryptionPassword -ne $Script:EncryptionPasswordConfirm -or
+            $Script:EncryptionPassword -eq "" -or
             $Script:EncryptionPassword -eq $Null) {
                 Update-Log "Password did not match or was blank." -Color 'Yellow'
         } else {
@@ -1123,8 +1123,8 @@ $WallpapersXML
     # Hide parent PowerShell window unless run from ISE
     if (-not $(Test-IsISE)) {
         $ShowWindowAsync = Add-Type -MemberDefinition @"
-    [DllImport("user32.dll")] 
-public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow); 
+    [DllImport("user32.dll")]
+public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
 "@ -Name "Win32ShowWindowAsync" -Namespace Win32Functions -PassThru
         $ShowWindowAsync::ShowWindowAsync((Get-Process -Id $PID).MainWindowHandle, 0) | Out-Null
     }
@@ -1138,9 +1138,9 @@ public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
 
 process {
     # Create form
-    $Form = New-Object System.Windows.Forms.Form 
+    $Form = New-Object System.Windows.Forms.Form
     $Form.Text = 'Migration Assistant by Nick Rodriguez'
-    $Form.Size = New-Object System.Drawing.Size(1000, 550) 
+    $Form.Size = New-Object System.Drawing.Size(1000, 550)
     $Form.SizeGripStyle = 'Hide'
     $Form.FormBorderStyle = 'FixedToolWindow'
     $Form.MaximizeBox = $false
@@ -1155,7 +1155,7 @@ process {
 
     # Log output text box
     $LogTextBox = New-Object System.Windows.Forms.RichTextBox
-    $LogTextBox.Location = New-Object System.Drawing.Size(500, 30) 
+    $LogTextBox.Location = New-Object System.Drawing.Size(500, 30)
     $LogTextBox.Size = New-Object System.Drawing.Size(475, 472)
     $LogTextBox.ReadOnly = 'True'
     $LogTextBox.BackColor = 'Black'
@@ -1214,7 +1214,7 @@ process {
     # Old Computer name text box
     $OldComputerNameTextBox_OldPage = New-Object System.Windows.Forms.TextBox
     $OldComputerNameTextBox_OldPage.ReadOnly = $true
-    $OldComputerNameTextBox_OldPage.Location = New-Object System.Drawing.Size(100, 34) 
+    $OldComputerNameTextBox_OldPage.Location = New-Object System.Drawing.Size(100, 34)
     $OldComputerNameTextBox_OldPage.Size = New-Object System.Drawing.Size(120, 20)
     $OldComputerNameTextBox_OldPage.Text = $env:COMPUTERNAME
     $OldComputerInfoGroupBox.Controls.Add($OldComputerNameTextBox_OldPage)
@@ -1222,7 +1222,7 @@ process {
     # Old Computer IP text box
     $OldComputerIPTextBox_OldPage = New-Object System.Windows.Forms.TextBox
     $OldComputerIPTextBox_OldPage.ReadOnly = $true
-    $OldComputerIPTextBox_OldPage.Location = New-Object System.Drawing.Size(230, 34) 
+    $OldComputerIPTextBox_OldPage.Location = New-Object System.Drawing.Size(230, 34)
     $OldComputerIPTextBox_OldPage.Size = New-Object System.Drawing.Size(90, 20)
     $OldComputerIPTextBox_OldPage.Text = Get-IPAddress
     $OldComputerInfoGroupBox.Controls.Add($OldComputerIPTextBox_OldPage)
@@ -1235,8 +1235,8 @@ process {
     $OldComputerInfoGroupBox.Controls.Add($NewComputerNameLabel_OldPage)
 
     # New Computer name text box
-    $NewComputerNameTextBox_OldPage = New-Object System.Windows.Forms.TextBox 
-    $NewComputerNameTextBox_OldPage.Location = New-Object System.Drawing.Size(100, 56) 
+    $NewComputerNameTextBox_OldPage = New-Object System.Windows.Forms.TextBox
+    $NewComputerNameTextBox_OldPage.Location = New-Object System.Drawing.Size(100, 56)
     $NewComputerNameTextBox_OldPage.Size = New-Object System.Drawing.Size(120, 20)
     $NewComputerNameTextBox_OldPage.Add_TextChanged({
         if ($ConnectionCheckBox_OldPage.Checked) {
@@ -1247,8 +1247,8 @@ process {
     $OldComputerInfoGroupBox.Controls.Add($NewComputerNameTextBox_OldPage)
 
     # New Computer IP text box
-    $NewComputerIPTextBox_OldPage = New-Object System.Windows.Forms.TextBox 
-    $NewComputerIPTextBox_OldPage.Location = New-Object System.Drawing.Size(230, 56) 
+    $NewComputerIPTextBox_OldPage = New-Object System.Windows.Forms.TextBox
+    $NewComputerIPTextBox_OldPage.Location = New-Object System.Drawing.Size(230, 56)
     $NewComputerIPTextBox_OldPage.Size = New-Object System.Drawing.Size(90, 20)
     $NewComputerIPTextBox_OldPage.Add_TextChanged({
         if ($ConnectionCheckBox_OldPage.Checked) {
@@ -1277,7 +1277,7 @@ process {
     $ConnectionCheckBox_OldPage = New-Object System.Windows.Forms.CheckBox
     $ConnectionCheckBox_OldPage.Enabled = $false
     $ConnectionCheckBox_OldPage.Text = 'Connected'
-    $ConnectionCheckBox_OldPage.Location = New-Object System.Drawing.Size(336, 58) 
+    $ConnectionCheckBox_OldPage.Location = New-Object System.Drawing.Size(336, 58)
     $ConnectionCheckBox_OldPage.Size = New-Object System.Drawing.Size(100, 20)
     $OldComputerInfoGroupBox.Controls.Add($ConnectionCheckBox_OldPage)
 
@@ -1295,7 +1295,7 @@ process {
     $SelectProfileButton.Text = 'Select Profile(s) to Migrate'
     $SelectProfileButton.Add_Click({
         Update-Log "Please wait while profiles are found..."
-        $Script:SelectedProfile = Get-UserProfiles | 
+        $Script:SelectedProfile = Get-UserProfiles |
             Out-GridView -Title 'Profile Selection' -OutputMode Multiple
         Update-Log "Profile(s) selected for migration:"
         $Script:SelectedProfile | ForEach-Object { Update-Log $_.UserName }
@@ -1303,8 +1303,8 @@ process {
     $SelectProfileGroupBox.Controls.Add($SelectProfileButton)
 
     # Recent profile day limit text box
-    $RecentProfilesDaysTextBox = New-Object System.Windows.Forms.TextBox 
-    $RecentProfilesDaysTextBox.Location = New-Object System.Drawing.Size(165, 70) 
+    $RecentProfilesDaysTextBox = New-Object System.Windows.Forms.TextBox
+    $RecentProfilesDaysTextBox.Location = New-Object System.Drawing.Size(165, 70)
     $RecentProfilesDaysTextBox.Size = New-Object System.Drawing.Size(40, 20)
     $RecentProfilesDaysTextBox.Text = $DefaultRecentProfilesDays
     $SelectProfileGroupBox.Controls.Add($RecentProfilesDaysTextBox)
@@ -1312,7 +1312,7 @@ process {
     # Only recent profiles check box
     $RecentProfilesCheckBox = New-Object System.Windows.Forms.CheckBox
     $RecentProfilesCheckBox.Text = 'Migrate all profiles logged into within this amount of days:'
-    $RecentProfilesCheckBox.Location = New-Object System.Drawing.Size(15, 50) 
+    $RecentProfilesCheckBox.Location = New-Object System.Drawing.Size(15, 50)
     $RecentProfilesCheckBox.Size = New-Object System.Drawing.Size(200, 40)
     $RecentProfilesCheckBox.Checked = $DefaultRecentProfiles
     $RecentProfilesCheckBox.Add_Click({
@@ -1336,7 +1336,7 @@ process {
     # Save path
     $SaveDestinationTextBox = New-Object System.Windows.Forms.TextBox
     $SaveDestinationTextBox.Text = $MigrationStorePath
-    $SaveDestinationTextBox.Location = New-Object System.Drawing.Size(5, 20) 
+    $SaveDestinationTextBox.Location = New-Object System.Drawing.Size(5, 20)
     $SaveDestinationTextBox.Size = New-Object System.Drawing.Size(210, 20)
     $SaveDestinationGroupBox.Controls.Add($SaveDestinationTextBox)
 
@@ -1389,7 +1389,7 @@ process {
     $IncludeAppDataCheckBox = New-Object System.Windows.Forms.CheckBox
     $IncludeAppDataCheckBox.Checked = $DefaultIncludeAppData
     $IncludeAppDataCheckBox.Text = 'AppData'
-    $IncludeAppDataCheckBox.Location = New-Object System.Drawing.Size(10, 15) 
+    $IncludeAppDataCheckBox.Location = New-Object System.Drawing.Size(10, 15)
     $IncludeAppDataCheckBox.Size = New-Object System.Drawing.Size(100, 20)
     $IncludeAppDataCheckBox.Add_Click({
         $ComponentName = $IncludeAppDataCheckBox.Text
@@ -1409,7 +1409,7 @@ process {
     $IncludeLocalAppDataCheckBox = New-Object System.Windows.Forms.CheckBox
     $IncludeLocalAppDataCheckBox.Checked = $DefaultIncludeLocalAppData
     $IncludeLocalAppDataCheckBox.Text = 'Local AppData'
-    $IncludeLocalAppDataCheckBox.Location = New-Object System.Drawing.Size(10, 35) 
+    $IncludeLocalAppDataCheckBox.Location = New-Object System.Drawing.Size(10, 35)
     $IncludeLocalAppDataCheckBox.Size = New-Object System.Drawing.Size(100, 20)
     $IncludeLocalAppDataCheckBox.Add_Click({
         $ComponentName = $IncludeLocalAppDataCheckBox.Text
@@ -1424,12 +1424,12 @@ process {
         }
     })
     $InclusionsGroupBox.Controls.Add($IncludeLocalAppDataCheckBox)
-    
+
     # Printers check box CSIDL_PRINTERS
     $IncludePrintersCheckBox = New-Object System.Windows.Forms.CheckBox
     $IncludePrintersCheckBox.Checked = $DefaultIncludePrinters
     $IncludePrintersCheckBox.Text = 'Printers'
-    $IncludePrintersCheckBox.Location = New-Object System.Drawing.Size(10, 55) 
+    $IncludePrintersCheckBox.Location = New-Object System.Drawing.Size(10, 55)
     $IncludePrintersCheckBox.Size = New-Object System.Drawing.Size(100, 20)
     $IncludePrintersCheckBox.Add_Click({
         $ComponentName = $IncludePrintersCheckBox.Text
@@ -1444,12 +1444,12 @@ process {
         }
     })
     $InclusionsGroupBox.Controls.Add($IncludePrintersCheckBox)
-    
+
     # Recycle Bin check box CSIDL_BITBUCKET
     $IncludeRecycleBinCheckBox = New-Object System.Windows.Forms.CheckBox
     $IncludeRecycleBinCheckBox.Checked = $DefaultIncludeRecycleBin
     $IncludeRecycleBinCheckBox.Text = 'Recycle Bin'
-    $IncludeRecycleBinCheckBox.Location = New-Object System.Drawing.Size(10, 75) 
+    $IncludeRecycleBinCheckBox.Location = New-Object System.Drawing.Size(10, 75)
     $IncludeRecycleBinCheckBox.Size = New-Object System.Drawing.Size(100, 20)
     $IncludeRecycleBinCheckBox.Add_Click({
         $ComponentName = $IncludeRecycleBinCheckBox.Text
@@ -1469,7 +1469,7 @@ process {
     $IncludeMyDocumentsCheckBox = New-Object System.Windows.Forms.CheckBox
     $IncludeMyDocumentsCheckBox.Checked = $DefaultIncludeMyDocuments
     $IncludeMyDocumentsCheckBox.Text = 'My Documents'
-    $IncludeMyDocumentsCheckBox.Location = New-Object System.Drawing.Size(10, 95) 
+    $IncludeMyDocumentsCheckBox.Location = New-Object System.Drawing.Size(10, 95)
     $IncludeMyDocumentsCheckBox.Size = New-Object System.Drawing.Size(100, 20)
     $IncludeMyDocumentsCheckBox.Add_Click({
         $ComponentName = $IncludeMyDocumentsCheckBox.Text
@@ -1489,7 +1489,7 @@ process {
     $IncludeWallpapersCheckBox = New-Object System.Windows.Forms.CheckBox
     $IncludeWallpapersCheckBox.Checked = $DefaultIncludeWallpapers
     $IncludeWallpapersCheckBox.Text = 'Wallpapers'
-    $IncludeWallpapersCheckBox.Location = New-Object System.Drawing.Size(10, 115) 
+    $IncludeWallpapersCheckBox.Location = New-Object System.Drawing.Size(10, 115)
     $IncludeWallpapersCheckBox.Size = New-Object System.Drawing.Size(100, 20)
     $IncludeWallpapersCheckBox.Add_Click({
         $ComponentName = $IncludeWallpapersCheckBox.Text
@@ -1504,12 +1504,12 @@ process {
         }
     })
     $InclusionsGroupBox.Controls.Add($IncludeWallpapersCheckBox)
-    
+
     # Desktop check box CSIDL_DESKTOP and CSIDL_DESKTOPDIRECTORY
     $IncludeDesktopCheckBox = New-Object System.Windows.Forms.CheckBox
     $IncludeDesktopCheckBox.Checked = $DefaultIncludeDesktop
     $IncludeDesktopCheckBox.Text = 'Desktop'
-    $IncludeDesktopCheckBox.Location = New-Object System.Drawing.Size(110, 15) 
+    $IncludeDesktopCheckBox.Location = New-Object System.Drawing.Size(110, 15)
     $IncludeDesktopCheckBox.Size = New-Object System.Drawing.Size(100, 20)
     $IncludeDesktopCheckBox.Add_Click({
         $ComponentName = $IncludeDesktopCheckBox.Text
@@ -1529,7 +1529,7 @@ process {
     $IncludeFavoritesCheckBox = New-Object System.Windows.Forms.CheckBox
     $IncludeFavoritesCheckBox.Checked = $DefaultIncludeFavorites
     $IncludeFavoritesCheckBox.Text = 'Favorites'
-    $IncludeFavoritesCheckBox.Location = New-Object System.Drawing.Size(110, 35) 
+    $IncludeFavoritesCheckBox.Location = New-Object System.Drawing.Size(110, 35)
     $IncludeFavoritesCheckBox.Size = New-Object System.Drawing.Size(100, 20)
     $IncludeFavoritesCheckBox.Add_Click({
         $ComponentName = $IncludeFavoritesCheckBox.Text
@@ -1549,7 +1549,7 @@ process {
     $IncludeMyMusicCheckBox = New-Object System.Windows.Forms.CheckBox
     $IncludeMyMusicCheckBox.Checked = $DefaultIncludeMyMusic
     $IncludeMyMusicCheckBox.Text = 'My Music'
-    $IncludeMyMusicCheckBox.Location = New-Object System.Drawing.Size(110, 55) 
+    $IncludeMyMusicCheckBox.Location = New-Object System.Drawing.Size(110, 55)
     $IncludeMyMusicCheckBox.Size = New-Object System.Drawing.Size(100, 20)
     $IncludeMyMusicCheckBox.Add_Click({
         $ComponentName = $IncludeMyMusicCheckBox.Text
@@ -1569,7 +1569,7 @@ process {
     $IncludeMyPicturesCheckBox = New-Object System.Windows.Forms.CheckBox
     $IncludeMyPicturesCheckBox.Checked = $DefaultIncludeMyPictures
     $IncludeMyPicturesCheckBox.Text = 'My Pictures'
-    $IncludeMyPicturesCheckBox.Location = New-Object System.Drawing.Size(110, 75) 
+    $IncludeMyPicturesCheckBox.Location = New-Object System.Drawing.Size(110, 75)
     $IncludeMyPicturesCheckBox.Size = New-Object System.Drawing.Size(100, 20)
     $IncludeMyPicturesCheckBox.Add_Click({
         $ComponentName = $IncludeMyPicturesCheckBox.Text
@@ -1589,7 +1589,7 @@ process {
     $IncludeMyVideoCheckBox = New-Object System.Windows.Forms.CheckBox
     $IncludeMyVideoCheckBox.Checked = $DefaultIncludeMyVideo
     $IncludeMyVideoCheckBox.Text = 'My Video'
-    $IncludeMyVideoCheckBox.Location = New-Object System.Drawing.Size(110, 95) 
+    $IncludeMyVideoCheckBox.Location = New-Object System.Drawing.Size(110, 95)
     $IncludeMyVideoCheckBox.Size = New-Object System.Drawing.Size(100, 20)
     $IncludeMyVideoCheckBox.Add_Click({
         $ComponentName = $IncludeMyVideoCheckBox.Text
@@ -1604,11 +1604,11 @@ process {
         }
     })
     $InclusionsGroupBox.Controls.Add($IncludeMyVideoCheckBox)
-    
+
     # Custom XML Box
     $IncludeCustomXMLButton = New-Object System.Windows.Forms.Button
     $IncludeCustomXMLButton.Text = 'Custom XML(s)'
-    $IncludeCustomXMLButton.Location = New-Object System.Drawing.Size(110, 115) 
+    $IncludeCustomXMLButton.Location = New-Object System.Drawing.Size(110, 115)
     $IncludeCustomXMLButton.Size = New-Object System.Drawing.Size(100, 20)
     $IncludeCustomXMLButton.Add_Click({
         # Create an array object as well as clear any existing Custom XML list if present
@@ -1656,7 +1656,7 @@ process {
     $ExtraDirectoriesGroupBox.Size = New-Object System.Drawing.Size(220, 200)
     $ExtraDirectoriesGroupBox.Text = 'Extra Directories to Include'
     $OldComputerTabPage.Controls.Add($ExtraDirectoriesGroupBox)
-    
+
     # Extra directories data table
     $ExtraDirectoriesDataGridView = New-Object System.Windows.Forms.DataGridView
     $ExtraDirectoriesDataGridView.Location = New-Object System.Drawing.Size(5, 20)
@@ -1693,7 +1693,7 @@ process {
     # Scanstate Encryption check box
     $ScanStateEncryptionCheckBox = New-Object System.Windows.Forms.CheckBox
     $ScanStateEncryptionCheckBox.Text = 'Encrypt captured Data.'
-    $ScanStateEncryptionCheckBox.Location = New-Object System.Drawing.Size(280, 340) 
+    $ScanStateEncryptionCheckBox.Location = New-Object System.Drawing.Size(280, 340)
     $ScanStateEncryptionCheckBox.Size = New-Object System.Drawing.Size(300, 30)
     $ScanStateEncryptionCheckBox.Add_Click({
         if ($ScanStateEncryptionCheckBox.Checked -eq $true) {
@@ -1714,7 +1714,7 @@ process {
     # Uncompressed storage check box
     $UncompressedCheckBox = New-Object System.Windows.Forms.CheckBox
     $UncompressedCheckBox.Text = 'Uncompressed storage'
-    $UncompressedCheckBox.Location = New-Object System.Drawing.Size(280, 370) 
+    $UncompressedCheckBox.Location = New-Object System.Drawing.Size(280, 370)
     $UncompressedCheckBox.Size = New-Object System.Drawing.Size(300, 30)
     $UncompressedCheckBox.Add_Click({
         if ($UncompressedCheckBox.Checked -eq $true) {
@@ -1749,7 +1749,7 @@ process {
     $NewComputerInfoGroupBox.Size = New-Object System.Drawing.Size(450, 87)
     $NewComputerInfoGroupBox.Text = 'Computer Info'
     $NewComputerTabPage.Controls.Add($NewComputerInfoGroupBox)
-    
+
     # Alternative save location group box
     $SaveSourceGroupBox = New-Object System.Windows.Forms.GroupBox
     $SaveSourceGroupBox.Location = New-Object System.Drawing.Size(240, 110)
@@ -1760,7 +1760,7 @@ process {
     # Save path
     $SaveSourceTextBox = New-Object System.Windows.Forms.TextBox
     $SaveSourceTextBox.Text = $MigrationStorePath
-    $SaveSourceTextBox.Location = New-Object System.Drawing.Size(5, 20) 
+    $SaveSourceTextBox.Location = New-Object System.Drawing.Size(5, 20)
     $SaveSourceTextBox.Size = New-Object System.Drawing.Size(210, 20)
     $SaveSourceGroupBox.Controls.Add($SaveSourceTextBox)
 
@@ -1769,7 +1769,7 @@ process {
     $ChangeSaveSourceButton.Location = New-Object System.Drawing.Size(5, 50)
     $ChangeSaveSourceButton.Size = New-Object System.Drawing.Size(60, 20)
     $ChangeSaveSourceButton.Text = 'Change'
-    $ChangeSaveSourceButton.Add_Click({ 
+    $ChangeSaveSourceButton.Add_Click({
         Set-SaveDirectory -Type Source
         $OldComputerNameTextBox_NewPage.Text = Get-SaveState
         Show-DomainInfo
@@ -1799,7 +1799,7 @@ process {
         Show-DomainInfo
     })
     $SaveSourceGroupBox.Controls.Add($ResetSaveSourceButton)
-    
+
     # Name label
     $ComputerNameLabel_NewPage = New-Object System.Windows.Forms.Label
     $ComputerNameLabel_NewPage.Location = New-Object System.Drawing.Size(100, 12)
@@ -1824,14 +1824,14 @@ process {
     # Old Computer name text box
     $OldComputerNameTextBox_NewPage = New-Object System.Windows.Forms.TextBox
     $OldComputerNameTextBox_NewPage.ReadOnly = $true
-    $OldComputerNameTextBox_NewPage.Location = New-Object System.Drawing.Size(100, 34) 
+    $OldComputerNameTextBox_NewPage.Location = New-Object System.Drawing.Size(100, 34)
     $OldComputerNameTextBox_NewPage.Size = New-Object System.Drawing.Size(120, 20)
     $OldComputerNameTextBox_NewPage.Text = Get-SaveState
     $NewComputerInfoGroupBox.Controls.Add($OldComputerNameTextBox_NewPage)
 
     # Old Computer IP text box
     $OldComputerIPTextBox_NewPage = New-Object System.Windows.Forms.TextBox
-    $OldComputerIPTextBox_NewPage.Location = New-Object System.Drawing.Size(230, 34) 
+    $OldComputerIPTextBox_NewPage.Location = New-Object System.Drawing.Size(230, 34)
     $OldComputerIPTextBox_NewPage.Size = New-Object System.Drawing.Size(90, 20)
     $OldComputerIPTextBox_NewPage.Add_TextChanged({
         if ($ConnectionCheckBox_NewPage.Checked) {
@@ -1873,7 +1873,7 @@ process {
         $TestComputerConnectionParams = @{
             ComputerNameTextBox = $OldComputerNameTextBox_NewPage
             ComputerIPTextBox = $OldComputerIPTextBox_NewPage
-            ConnectionCheckBox = $ConnectionCheckBox_NewPage 
+            ConnectionCheckBox = $ConnectionCheckBox_NewPage
         }
         Test-ComputerConnection @TestComputerConnectionParams
     })
@@ -1883,7 +1883,7 @@ process {
     $ConnectionCheckBox_NewPage = New-Object System.Windows.Forms.CheckBox
     $ConnectionCheckBox_NewPage.Enabled = $false
     $ConnectionCheckBox_NewPage.Text = 'Connected'
-    $ConnectionCheckBox_NewPage.Location = New-Object System.Drawing.Size(336, 58) 
+    $ConnectionCheckBox_NewPage.Location = New-Object System.Drawing.Size(336, 58)
     $ConnectionCheckBox_NewPage.Size = New-Object System.Drawing.Size(100, 20)
     $NewComputerInfoGroupBox.Controls.Add($ConnectionCheckBox_NewPage)
 
@@ -1918,7 +1918,7 @@ process {
     # Old domain text box
     $OldDomainTextBox = New-Object System.Windows.Forms.TextBox
     $OldDomainTextBox.ReadOnly = $true
-    $OldDomainTextBox.Location = New-Object System.Drawing.Size(70, 34) 
+    $OldDomainTextBox.Location = New-Object System.Drawing.Size(70, 34)
     $OldDomainTextBox.Size = New-Object System.Drawing.Size(40, 20)
     $OldDomainTextBox.Text = $OldComputerNameTextBox_NewPage.Text
     $CrossDomainMigrationGroupBox.Controls.Add($OldDomainTextBox)
@@ -1934,7 +1934,7 @@ process {
     # Old user name text box
     $OldUserNameTextBox = New-Object System.Windows.Forms.TextBox
     $OldUserNameTextBox.ReadOnly = $true
-    $OldUserNameTextBox.Location = New-Object System.Drawing.Size(125, 34) 
+    $OldUserNameTextBox.Location = New-Object System.Drawing.Size(125, 34)
     $OldUserNameTextBox.Size = New-Object System.Drawing.Size(80, 20)
     $CrossDomainMigrationGroupBox.Controls.Add($OldUserNameTextBox)
 
@@ -1971,7 +1971,7 @@ process {
     # Override check box
     $OverrideCheckBox = New-Object System.Windows.Forms.CheckBox
     $OverrideCheckBox.Text = 'Save state task completed'
-    $OverrideCheckBox.Location = New-Object System.Drawing.Size(280, 225) 
+    $OverrideCheckBox.Location = New-Object System.Drawing.Size(280, 225)
     $OverrideCheckBox.Size = New-Object System.Drawing.Size(300, 30)
     $OverrideCheckBox.Add_Click({
         if ($OverrideCheckBox.Checked -eq $true) {
@@ -1989,7 +1989,7 @@ process {
     # LoadState Encryption check box
     $LoadStateEncryptionCheckBox = New-Object System.Windows.Forms.CheckBox
     $LoadStateEncryptionCheckBox.Text = 'Saved data was encrypted.'
-    $LoadStateEncryptionCheckBox.Location = New-Object System.Drawing.Size(280, 250) 
+    $LoadStateEncryptionCheckBox.Location = New-Object System.Drawing.Size(280, 250)
     $LoadStateEncryptionCheckBox.Size = New-Object System.Drawing.Size(300, 30)
     $LoadStateEncryptionCheckBox.Add_Click({
         if ($LoadStateEncryptionCheckBox.Checked -eq $true) {
@@ -2028,7 +2028,7 @@ process {
     # Email enabled check box
     $EmailCheckBox = New-Object System.Windows.Forms.CheckBox
     $EmailCheckBox.Text = 'Enabled'
-    $EmailCheckBox.Location = New-Object System.Drawing.Size(10, 10) 
+    $EmailCheckBox.Location = New-Object System.Drawing.Size(10, 10)
     $EmailCheckBox.Size = New-Object System.Drawing.Size(300, 30)
     $EmailCheckBox.Checked = $DefaultEmailEnabled
     $EmailCheckBox.Add_Click({
@@ -2051,7 +2051,7 @@ process {
 
     # SMTP server text box
     $SMTPServerTextBox = New-Object System.Windows.Forms.TextBox
-    $SMTPServerTextBox.Location = New-Object System.Drawing.Size(5, 20) 
+    $SMTPServerTextBox.Location = New-Object System.Drawing.Size(5, 20)
     $SMTPServerTextBox.Size = New-Object System.Drawing.Size(210, 25)
     $SMTPServerTextBox.Text = $DefaultSMTPServer
     $SMTPServerGroupBox.Controls.Add($SMTPServerTextBox)
@@ -2077,7 +2077,7 @@ process {
     $SMTPConnectionCheckBox = New-Object System.Windows.Forms.CheckBox
     $SMTPConnectionCheckBox.Enabled = $false
     $SMTPConnectionCheckBox.Text = 'Reachable'
-    $SMTPConnectionCheckBox.Location = New-Object System.Drawing.Size(135, 50) 
+    $SMTPConnectionCheckBox.Location = New-Object System.Drawing.Size(135, 50)
     $SMTPConnectionCheckBox.Size = New-Object System.Drawing.Size(100, 20)
     $SMTPServerGroupBox.Controls.Add($SMTPConnectionCheckBox)
 
@@ -2099,7 +2099,7 @@ process {
 
     # Email sender text box
     $EmailSenderTextBox = New-Object System.Windows.Forms.TextBox
-    $EmailSenderTextBox.Location = New-Object System.Drawing.Size(5, 20) 
+    $EmailSenderTextBox.Location = New-Object System.Drawing.Size(5, 20)
     $EmailSenderTextBox.Size = New-Object System.Drawing.Size(210, 25)
     $EmailSenderTextBox.Text = $DefaultEmailSender
     $EmailSenderGroupBox.Controls.Add($EmailSenderTextBox)
@@ -2110,7 +2110,7 @@ process {
     $EmailRecipientsGroupBox.Size = New-Object System.Drawing.Size(220, 230)
     $EmailRecipientsGroupBox.Text = 'Email Recipients'
     $EmailSettingsTabPage.Controls.Add($EmailRecipientsGroupBox)
-    
+
     # Email recipients data table
     $EmailRecipientsDataGridView = New-Object System.Windows.Forms.DataGridView
     $EmailRecipientsDataGridView.Location = New-Object System.Drawing.Size(5, 20)
@@ -2158,7 +2158,7 @@ process {
 
     # Email recipient to add text box
     $EmailRecipientToAddTextBox = New-Object System.Windows.Forms.TextBox
-    $EmailRecipientToAddTextBox.Location = New-Object System.Drawing.Size(5, 200) 
+    $EmailRecipientToAddTextBox.Location = New-Object System.Drawing.Size(5, 200)
     $EmailRecipientToAddTextBox.Size = New-Object System.Drawing.Size(210, 25)
     $EmailRecipientToAddTextBox.Text = 'Recipient@To.Add'
     $EmailRecipientsGroupBox.Controls.Add($EmailRecipientToAddTextBox)
@@ -2185,7 +2185,7 @@ process {
     $OldComputerScriptsGroupBox.Size = New-Object System.Drawing.Size(450, 220)
     $OldComputerScriptsGroupBox.Text = 'Old Computer Scripts'
     $ScriptsTabPage.Controls.Add($OldComputerScriptsGroupBox)
-    
+
     # Old computer scripts data table
     $OldComputerScriptsDataGridView = New-Object System.Windows.Forms.DataGridView
     $OldComputerScriptsDataGridView.Location = New-Object System.Drawing.Size(5, 20)
@@ -2229,7 +2229,7 @@ process {
     $NewComputerScriptsGroupBox.Size = New-Object System.Drawing.Size(450, 220)
     $NewComputerScriptsGroupBox.Text = 'New Computer Scripts'
     $ScriptsTabPage.Controls.Add($NewComputerScriptsGroupBox)
-    
+
     # New computer scripts data table
     $NewComputerScriptsDataGridView = New-Object System.Windows.Forms.DataGridView
     $NewComputerScriptsDataGridView.Location = New-Object System.Drawing.Size(5, 20)

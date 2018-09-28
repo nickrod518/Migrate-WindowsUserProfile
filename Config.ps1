@@ -26,7 +26,7 @@ $ValidIPAddress = '*'
 # Path to store the migration data on the new computer, directory will be created if it doesn't exist
 $MigrationStorePath = 'C:\TEMP\MigrationStore'
 
-# Default user profile items to exclude from migration, more info found here: 
+# Default user profile items to exclude from migration, more info found here:
 # https://technet.microsoft.com/en-us/library/cc722303(v=ws.10).aspx
 $DefaultIncludeAppData = $true
 $DefaultIncludeLocalAppData = $false
@@ -48,14 +48,14 @@ $DefaultRecentProfiles = $true
 $DefaultRecentProfilesDays = 90
 
 # Get USMT binary path according to OS architecture. If you used the zip provided, unzip in the same directory as this script
-if ((Get-WmiObject Win32_OperatingSystem).OSArchitecture -match '64') { 
+if ((Get-WmiObject Win32_OperatingSystem).OSArchitecture -match '64') {
     $USMTPath = "$ScriptRoot\USMT\amd64"
-} else { 
+} else {
     $USMTPath = "$ScriptRoot\USMT\x86"
 }
 
 # Define whether to continue on errors such as file already exists during restore or read issue during capture.
-$ContinueOnError = $True
+$ContinueOnError = $true
 
 <# Define the level of verbosity for the USMT scan/load commands
 0 Only the default errors and warnings are enabled.
