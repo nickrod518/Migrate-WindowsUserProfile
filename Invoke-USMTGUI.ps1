@@ -1670,6 +1670,14 @@ process {
     $ExtraDirectoriesDataGridView.AutoSizeColumnsMode = 'Fill'
     $ExtraDirectoriesDataGridView.ColumnHeadersVisible = $false
     $ExtraDirectoriesDataGridView.RowHeadersVisible = $false
+    foreach ($directory in $DefaultExtraDirectories) {
+        if (Test-Path $directory) {
+            $ExtraDirectoriesDataGridView.Rows.Add($directory)
+        }
+        else {
+            Update-Log "Extra default directory [$directory] not found. Ensure it exists before running migration." -Color 'Yellow'
+        }
+    }
     $ExtraDirectoriesGroupBox.Controls.Add($ExtraDirectoriesDataGridView)
 
     # Remove Extra directory button
