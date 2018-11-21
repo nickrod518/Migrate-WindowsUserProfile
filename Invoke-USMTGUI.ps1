@@ -12,18 +12,19 @@ USMT environmental variables: https://technet.microsoft.com/en-us/library/cc7491
 #>
 
 begin {
-	# Define the script version
-	$ScriptVersion = "3.3.3"
+    # Define the script version
+    $ScriptVersion = "3.3.4"
 
     # Set ScripRoot variable to the path which the script is executed from
     $ScriptRoot = if ($PSVersionTable.PSVersion.Major -lt 3) {
         Split-Path -Path $MyInvocation.MyCommand.Path
-    } else {
+    }
+    else {
         $PSScriptRoot
     }
 
     # Load the options in the Config file
-	. "$ScriptRoot\Config.ps1"
+    . "$ScriptRoot\Config.ps1"
 
     # Set a value for the wscript comobject
     $WScriptShell = New-Object -ComObject wscript.shell
@@ -56,11 +57,14 @@ begin {
         if ($CurrentUser.Properties.LastLogin) {
             try {
                 [datetime](-join $CurrentUser.Properties.LastLogin)
-            } catch {
+            }
+            catch {
                 -join $CurrentUser.Properties.LastLogin
             }
-        } elseif ($CurrentUser.Properties.Name) {
-        } else {
+        }
+        elseif ($CurrentUser.Properties.Name) {
+        }
+        else {
             'N/A'
         }
     }
@@ -83,7 +87,8 @@ begin {
                         $UserName = $User.Split('\')[1]
                         if ($Script:QueryLastLogon) {
                             $LastLogin = Get-UserProfileLastLogin -Domain $Domain -UserName $UserName
-                        } else {
+                        }
+                        else {
                             $LastLogin = 'N/A'
                         }
                         $ProfilePath = Get-UserProfilePath -Domain $Domain -UserName $UserName
@@ -96,10 +101,12 @@ begin {
                         $UserObject | Add-Member -MemberType NoteProperty -Name ProfilePath -Value $ProfilePath
                         $UserObject
                     }
-                } catch {
+                }
+                catch {
                     Update-Log "Error while translating $SID to a user name." -Color 'Yellow'
                 }
-            } catch {
+            }
+            catch {
                 Update-Log "Error while translating $($_.PSChildName) to SID." -Color 'Yellow'
             }
         }
@@ -139,7 +146,8 @@ begin {
         $OpenDirectoryDialog.SelectedPath = $SaveDestinationTextBox.Text
         if ($Type -eq 'Destination') {
             $OpenDirectoryDialog.SelectedPath = $SaveDestinationTextBox.Text
-        } else {
+        }
+        else {
             $OpenDirectoryDialog.SelectedPath = $SaveSourceTextBox.Text
         }
         $OpenDirectoryDialog.ShowDialog() | Out-Null
@@ -150,11 +158,13 @@ begin {
                 Update-Log "Changed save directory to [$SelectedDirectory]."
                 if ($Type -eq 'Destination') {
                     $SaveDestinationTextBox.Text = $SelectedDirectory
-                } else {
+                }
+                else {
                     $SaveSourceTextBox.Text = $SelectedDirectory
                 }
             }
-        } catch {
+        }
+        catch {
             Update-Log "There was a problem with the directory you chose: $($_.Exception.Message)" -Color Red
         }
     }
@@ -171,10 +181,12 @@ begin {
             if ($Result -eq 'OK') {
                 Update-Log "Adding to extra directories: $SelectedDirectory."
                 $ExtraDirectoriesDataGridView.Rows.Add($SelectedDirectory)
-            } else {
+            }
+            else {
                 Update-Log "Add directory action cancelled by user." -Color Yellow
             }
-        } catch {
+        }
+        catch {
             Update-Log "There was a problem with the directory you chose: $($_.Exception.Message)" -Color Red
         }
     }
@@ -221,7 +233,8 @@ begin {
         </role>
     </component>
 "@
-        } else {
+        }
+        else {
             Update-Log 'No extra directories will be included.'
         }
 
@@ -359,7 +372,7 @@ begin {
                 </role>
             </component>
 "@
-}
+        }
 
         $ConfigContent = @"
 <?xml version="1.0" encoding="UTF-8"?>
@@ -417,13 +430,15 @@ $WallpapersXML
         $Config = "$Destination\Config.xml"
         try {
             New-Item $Config -ItemType File -Force -ErrorAction Stop | Out-Null
-        } catch {
+        }
+        catch {
             Update-Log "Error creating config file [$Config]: $($_.Exception.Message)" -Color 'Red'
             return
         }
         try {
             Set-Content $Config $ConfigContent -ErrorAction Stop
-        } catch {
+        }
+        catch {
             Update-Log "Error while setting config file content: $($_.Exception.Message)" -Color 'Red'
             return
         }
@@ -437,8 +452,9 @@ $WallpapersXML
         if (Test-Path $USMTPath) {
             $Script:ScanState = "$USMTPath\scanstate.exe"
             $Script:LoadState = "$USMTPath\loadstate.exe"
-			Update-Log "Using [$USMTPath] as path to USMT binaries."
-        } else {
+            Update-Log "Using [$USMTPath] as path to USMT binaries."
+        }
+        else {
             Update-Log "Unable to reach USMT binaries. Verify [$USMTPath] exists and restart script.`n" -Color 'Red'
             $MigrateButton_OldPage.Enabled = $false
             $MigrateButton_NewPage.Enabled = $false
@@ -451,7 +467,8 @@ $WallpapersXML
         if ($PSVersionTable.PSVersion.Major -lt 3) {
             # Print back the entire log
             $Results = Get-Content "$Destination\$ActionType.log" | Out-String
-        } else {
+        }
+        else {
             # Get the last 4 lines from the log so we can see the results
             $Results = Get-Content "$Destination\$ActionType.log" -Tail 4 | ForEach-Object {
                 ($_.Split(']', 2)[1]).TrimStart()
@@ -460,11 +477,12 @@ $WallpapersXML
 
         Update-Log $Results -Color 'Cyan'
 
-		if ($ActionType -eq 'load') {
-			Update-Log 'A reboot is recommended.' -Color 'Yellow'
+        if ($ActionType -eq 'load') {
+            Update-Log 'A reboot is recommended.' -Color 'Yellow'
 
             $EmailSubject = "Migration Load Results of $($OldComputerNameTextBox_NewPage.Text) to $($NewComputerNameTextBox_NewPage.Text)"
-		} else {
+        }
+        else {
             $EmailSubject = "Migration Save Results of $($OldComputerNameTextBox_OldPage.Text) to $($NewComputerNameTextBox_OldPage.Text)"
         }
 
@@ -483,18 +501,20 @@ $WallpapersXML
 
                 try {
                     $SendMailMessageParams = @{
-                        From = $EmailSenderTextBox.Text
-                        To = $EmailRecipients
-                        Subject = $EmailSubject
-                        Body = $LogTextBox.Text
-                        SmtpServer = $SMTPServerTextBox.Text
+                        From        = $EmailSenderTextBox.Text
+                        To          = $EmailRecipients
+                        Subject     = $EmailSubject
+                        Body        = $LogTextBox.Text
+                        SmtpServer  = $SMTPServerTextBox.Text
                         Attachments = "$Destination\$ActionType.log"
                     }
                     Send-MailMessage @SendMailMessageParams
-                } catch {
+                }
+                catch {
                     Update-Log "Error occurred sending email: $($_.Exception.Message)" -Color 'Red'
                 }
-            } else {
+            }
+            else {
                 Update-Log "Unable to send email of results because SMTP server [$($SMTPServerTextBox.Text)] is unreachable." -Color 'Yellow'
             }
         }
@@ -511,7 +531,8 @@ $WallpapersXML
             # Get the most recent entry in the progress log
             $LastLine = Get-Content "$Destination\$($ActionType)_progress.log" -Tail 1 -ErrorAction SilentlyContinue | Out-String
             Update-Log ($LastLine.Split(',', 4)[3]).TrimStart()
-        } catch { Update-Log '.' -NoNewLine }
+        }
+        catch { Update-Log '.' -NoNewLine }
     }
 
     function Get-SaveState {
@@ -521,13 +542,15 @@ $WallpapersXML
                 Sort-Object -Descending -Property { $_.CreationTime } | Select-Object -First 1
             if (Test-Path "$($SaveSource.FullName)\USMT\USMT.MIG") {
                 $Script:UncompressedSource = $false
-            } else {
+            }
+            else {
                 $Script:UncompressedSource = $true
                 Update-Log -Message "Uncompressed save state detected."
             }
             $OldComputer = $SaveSource.BaseName
             Update-Log -Message "Old computer set to $OldComputer."
-        } else {
+        }
+        else {
             $OldComputer = 'N/A'
             Update-Log -Message "No saved state found at [$($SaveSourceTextBox.Text)]." -Color 'Yellow'
         }
@@ -541,7 +564,8 @@ $WallpapersXML
             $OldUser = Get-Content "$MigrationStorePath\$($OldComputerNameTextBox_NewPage.Text)\DomainMigration.txt"
             $OldDomainTextBox.Text = $OldUser.Split('\')[0]
             $OldUserNameTextBox.Text = $OldUser.Split('\')[1]
-        } else {
+        }
+        else {
             $CrossDomainMigrationGroupBox.Enabled = $false
             $CrossDomainMigrationGroupBox.Hide()
         }
@@ -562,7 +586,8 @@ $WallpapersXML
             if (-not $Debug) {
                 $Result = if ($ScriptPath.EndsWith('ps1')) {
                     . $ScriptPath
-                } else {
+                }
+                else {
                     Start-Process $ScriptPath -Wait -PassThru
                 }
                 Update-Log ($Result | Out-String)
@@ -575,8 +600,8 @@ $WallpapersXML
             if (-not $ConnectionCheckBox_OldPage.Checked) {
                 $TestComputerConnectionParams = @{
                     ComputerNameTextBox = $NewComputerNameTextBox_OldPage
-                    ComputerIPTextBox = $NewComputerIPTextBox_OldPage
-                    ConnectionCheckBox = $ConnectionCheckBox_OldPage
+                    ComputerIPTextBox   = $NewComputerIPTextBox_OldPage
+                    ConnectionCheckBox  = $ConnectionCheckBox_OldPage
                 }
                 Test-ComputerConnection @TestComputerConnectionParams
             }
@@ -584,7 +609,8 @@ $WallpapersXML
             # Try and use the IP if the user filled that out, otherwise use the name
             if ($NewComputerIPTextBox_OldPage.Text -ne '') {
                 $NewComputer = $NewComputerIPTextBox_OldPage.Text
-            } else {
+            }
+            else {
                 $NewComputer = $NewComputerNameTextBox_OldPage.Text
             }
         }
@@ -598,155 +624,164 @@ $WallpapersXML
             # Get the selected profiles
             if ($RecentProfilesCheckBox.Checked -eq $true) {
                 Update-Log "All profiles logged into within the last $($RecentProfilesDaysTextBox.Text) days will be saved."
-            } elseif ($Script:SelectedProfile) {
+            }
+            elseif ($Script:SelectedProfile) {
                 Update-Log "Profile(s) selected for save state:"
                 $Script:SelectedProfile | ForEach-Object { Update-Log $_.UserName }
-            } else {
+            }
+            else {
                 Update-Log "You must select a user profile." -Color 'Red'
                 return
             }
 
             if (-not $SaveRemotelyCheckBox.Checked) {
                 $Script:Destination = "$($SaveDestinationTextBox.Text)\$OldComputer"
-            } else {
+            }
+            else {
                 # Set destination folder on new computer
                 try {
                     $DriveLetter = $MigrationStorePath.Split(':', 2)[0]
                     $MigrationStorePath = $MigrationStorePath.TrimStart('C:\')
                     New-Item "\\$NewComputer\$DriveLetter$\$MigrationStorePath" -ItemType Directory -Force | Out-Null
                     $Script:Destination = "\\$NewComputer\$DriveLetter$\$MigrationStorePath\$OldComputer"
-                } catch {
+                }
+                catch {
                     Update-Log "Error while creating migration store [$Destination]: $($_.Exception.Message)" -Color 'Yellow'
                     return
                 }
             }
 
             # Create destination folder
-			if (!(Test-Path $Destination)){
-				try {
-					New-Item $Destination -ItemType Directory -Force | Out-Null
-				} catch {
-					Update-Log "Error while creating migration store [$Destination]: $($_.Exception.Message)" -Color 'Yellow'
-					return
-				}
-			}
+            if (!(Test-Path $Destination)) {
+                try {
+                    New-Item $Destination -ItemType Directory -Force | Out-Null
+                }
+                catch {
+                    Update-Log "Error while creating migration store [$Destination]: $($_.Exception.Message)" -Color 'Yellow'
+                    return
+                }
+            }
 
-			#Verify that the Destination folder is valid.
-			if (Test-Path $Destination){
+            #Verify that the Destination folder is valid.
+            if (Test-Path $Destination) {
 
-				# If profile is a domain other than $DefaultDomain, save this info to text file
-				if ($RecentProfilesCheckBox.Checked -eq $false) {
-					$FullUserName = "$($Script:SelectedProfile.Domain)\$($Script:SelectedProfile.UserName)"
-					if ($Script:SelectedProfile.Domain -ne $DefaultDomain) {
-						New-Item "$Destination\DomainMigration.txt" -ItemType File -Value $FullUserName -Force | Out-Null
-						Update-Log "Text file created with cross-domain information."
-					}
-				}
+                # If profile is a domain other than $DefaultDomain, save this info to text file
+                if ($RecentProfilesCheckBox.Checked -eq $false) {
+                    $FullUserName = "$($Script:SelectedProfile.Domain)\$($Script:SelectedProfile.UserName)"
+                    if ($Script:SelectedProfile.Domain -ne $DefaultDomain) {
+                        New-Item "$Destination\DomainMigration.txt" -ItemType File -Value $FullUserName -Force | Out-Null
+                        Update-Log "Text file created with cross-domain information."
+                    }
+                }
 
-				# Clear encryption syntax in case it's already defined.
-				$EncryptionSyntax = ""
-				# Determine if Encryption has been requested
-				if ($Script:EncryptionPasswordSet -eq $True){
+                # Clear encryption syntax in case it's already defined.
+                $EncryptionSyntax = ""
+                # Determine if Encryption has been requested
+                if ($Script:EncryptionPasswordSet -eq $True) {
                     #Disable Compression
                     $Script:UncompressedSource = $false
                     $Uncompressed = ''
-					# Set the syntax for the encryption
-					$EncryptionKey = """$Script:EncryptionPassword"""
-					$EncryptionSyntax = "/encrypt /key:$EncryptionKey"
-				}
+                    # Set the syntax for the encryption
+                    $EncryptionKey = """$Script:EncryptionPassword"""
+                    $EncryptionSyntax = "/encrypt /key:$EncryptionKey"
+                }
 
-				#Set the value to continue on error if it was specified above
-				if ($ContinueOnError -eq $True){
-					$ContinueCommand  = "/c"
-					}
-				if ($ContinueOnError -eq $False){
-					$ContinueCommand = ""
-				}
+                #Set the value to continue on error if it was specified above
+                if ($ContinueOnError -eq $True) {
+                    $ContinueCommand = "/c"
+                }
+                if ($ContinueOnError -eq $False) {
+                    $ContinueCommand = ""
+                }
 
 
-				# Create config syntax for scanstate for custom XMLs.
-				IF ($SelectedXMLS) {
-					#Create the scanstate syntax line for the config files.
-					foreach ($ConfigXML in $SelectedXMLS) {
-						$ConfigXMLPath = """$Script:USMTPath\$ConfigXML"""
-						$ScanstateConfig += "/i:$ConfigXMLPath "
-					 }
-				}
+                # Create config syntax for scanstate for custom XMLs.
+                IF ($SelectedXMLS) {
+                    #Create the scanstate syntax line for the config files.
+                    foreach ($ConfigXML in $SelectedXMLS) {
+                        $ConfigXMLPath = """$Script:USMTPath\$ConfigXML"""
+                        $ScanstateConfig += "/i:$ConfigXMLPath "
+                    }
+                }
 
-				# Create config syntax for scanstate for generated XML.
-				IF (!($SelectedXMLS)){
-					# Create the scan configuration
-					Update-Log 'Generating configuration file...'
-					$Config = Set-Config
-					$GeneratedConfig = """$Config"""
-					$ScanStateConfig = "/i:$GeneratedConfig"
-				}
+                # Create config syntax for scanstate for generated XML.
+                IF (!($SelectedXMLS)) {
+                    # Create the scan configuration
+                    Update-Log 'Generating configuration file...'
+                    $Config = Set-Config
+                    $GeneratedConfig = """$Config"""
+                    $ScanStateConfig = "/i:$GeneratedConfig"
+                }
 
-				# Generate parameter for logging
-				$Logs = "`"/listfiles:$Destination\FilesMigrated.log`" `"/l:$Destination\scan.log`" `"/progress:$Destination\scan_progress.log`""
+                # Generate parameter for logging
+                $Logs = "`"/listfiles:$Destination\FilesMigrated.log`" `"/l:$Destination\scan.log`" `"/progress:$Destination\scan_progress.log`""
 
-				# Set parameter for whether save state is compressed
-				if ($UncompressedCheckBox.Checked -eq $true) {
-					$Uncompressed = '/nocompress'
-				} else {
-					$Uncompressed = ''
-				}
+                # Set parameter for whether save state is compressed
+                if ($UncompressedCheckBox.Checked -eq $true) {
+                    $Uncompressed = '/nocompress'
+                }
+                else {
+                    $Uncompressed = ''
+                }
 
-				# Create a string for all users to exclude by default
-				foreach ($ExcludeProfile in $Script:DefaultExcludeProfile) {
-					$ExcludeProfile = """$ExcludeProfile"""
-					$UsersToExclude += "/ue:$ExcludeProfile "
-				}
+                # Create a string for all users to exclude by default
+                foreach ($ExcludeProfile in $Script:DefaultExcludeProfile) {
+                    $ExcludeProfile = """$ExcludeProfile"""
+                    $UsersToExclude += "/ue:$ExcludeProfile "
+                }
 
                 # Set the EFS Syntax based on the config.
-                if ($EFSHandling){
+                if ($EFSHandling) {
                     $EFSSyntax = "/efs:$EFSHandling"
                 }
 
 
-				# Overwrite existing save state, use volume shadow copy method, exclude all but the selected profile(s)
-				# Get the selected profiles
-				if ($RecentProfilesCheckBox.Checked -eq $true) {
-					$Arguments = "`"$Destination`" $ScanStateConfig /o /vsc $UsersToExclude /uel:$($RecentProfilesDaysTextBox.Text) $EncryptionSyntax $Uncompressed $Logs $EFSSyntax $ContinueCommand"
-				} else {
-					$UsersToInclude += $Script:SelectedProfile | ForEach-Object { "`"/ui:$($_.Domain)\$($_.UserName)`"" }
-					$Arguments = "`"$Destination`" $ScanStateConfig /o /vsc /ue:* $UsersToExclude $UsersToInclude $EncryptionSyntax $Uncompressed $Logs $EFSSyntax $ContinueCommand "
-				}
+                # Overwrite existing save state, use volume shadow copy method, exclude all but the selected profile(s)
+                # Get the selected profiles
+                if ($RecentProfilesCheckBox.Checked -eq $true) {
+                    $Arguments = "`"$Destination`" $ScanStateConfig /o /vsc $UsersToExclude /uel:$($RecentProfilesDaysTextBox.Text) $EncryptionSyntax $Uncompressed $Logs $EFSSyntax $ContinueCommand"
+                }
+                else {
+                    $UsersToInclude += $Script:SelectedProfile | ForEach-Object { "`"/ui:$($_.Domain)\$($_.UserName)`"" }
+                    $Arguments = "`"$Destination`" $ScanStateConfig /o /vsc /ue:* $UsersToExclude $UsersToInclude $EncryptionSyntax $Uncompressed $Logs $EFSSyntax $ContinueCommand "
+                }
 
-				# Begin saving user state to new computer
-				# Create a value to show in the log in order to obscure the encryption key if one was used.
-				$LogArguments = $Arguments -Replace '/key:".*"','/key:(Hidden)'
+                # Begin saving user state to new computer
+                # Create a value to show in the log in order to obscure the encryption key if one was used.
+                $LogArguments = $Arguments -Replace '/key:".*"', '/key:(Hidden)'
 
-				Update-Log "Command used:"
-				Update-Log "$ScanState $LogArguments" -Color 'Cyan'
+                Update-Log "Command used:"
+                Update-Log "$ScanState $LogArguments" -Color 'Cyan'
 
 
-				# If we're running in debug mode don't actually start the process
-				if ($Debug) { return }
+                # If we're running in debug mode don't actually start the process
+                if ($Debug) { return }
 
-				Update-Log "Saving state of $OldComputer to $Destination..." -NoNewLine
-				Start-Process -FilePath $ScanState -ArgumentList $Arguments -Verb RunAs
+                Update-Log "Saving state of $OldComputer to $Destination..." -NoNewLine
+                Start-Process -FilePath $ScanState -ArgumentList $Arguments -Verb RunAs
 
-				# Give the process time to start before checking for its existence
-				Start-Sleep -Seconds 3
+                # Give the process time to start before checking for its existence
+                Start-Sleep -Seconds 3
 
-				# Wait until the save state is complete
-				try {
-					$ScanProcess = Get-Process -Name scanstate -ErrorAction Stop
-					while (-not $ScanProcess.HasExited) {
-						Get-USMTProgress
-						Start-Sleep -Seconds 3
-					}
-					Update-Log "Complete!" -Color 'Green'
+                # Wait until the save state is complete
+                try {
+                    $ScanProcess = Get-Process -Name scanstate -ErrorAction Stop
+                    while (-not $ScanProcess.HasExited) {
+                        Get-USMTProgress
+                        Start-Sleep -Seconds 3
+                    }
+                    Update-Log "Complete!" -Color 'Green'
 
-					Update-Log 'Results:'
-					Get-USMTResults -ActionType 'scan'
-				} catch {
-					Update-Log $_.Exception.Message -Color 'Red'
-				}
-			} ELSE {
-				Update-Log "Error when trying to access [$Destination] Please verify that the user account running the utility has appropriate permissions to the folder.: $($_.Exception.Message)" -Color 'Yellow'
-			}
+                    Update-Log 'Results:'
+                    Get-USMTResults -ActionType 'scan'
+                }
+                catch {
+                    Update-Log $_.Exception.Message -Color 'Red'
+                }
+            }
+            ELSE {
+                Update-Log "Error when trying to access [$Destination] Please verify that the user account running the utility has appropriate permissions to the folder.: $($_.Exception.Message)" -Color 'Yellow'
+            }
         }
     }
 
@@ -765,7 +800,8 @@ $WallpapersXML
             if (-not $Debug) {
                 $Result = if ($ScriptPath.EndsWith('ps1')) {
                     . $ScriptPath
-                } else {
+                }
+                else {
                     Start-Process $ScriptPath -Wait -PassThru
                 }
                 Update-Log ($Result | Out-String)
@@ -778,8 +814,8 @@ $WallpapersXML
             if (-not $ConnectionCheckBox_NewPage.Checked) {
                 $TestComputerConnectionParams = @{
                     ComputerNameTextBox = $OldComputerNameTextBox_NewPage
-                    ComputerIPTextBox = $OldComputerIPTextBox_NewPage
-                    ConnectionCheckBox = $ConnectionCheckBox_NewPage
+                    ComputerIPTextBox   = $OldComputerIPTextBox_NewPage
+                    ConnectionCheckBox  = $ConnectionCheckBox_NewPage
                 }
                 Test-ComputerConnection @TestComputerConnectionParams
             }
@@ -787,7 +823,8 @@ $WallpapersXML
             # Try and use the IP if the user filled that out, otherwise use the name
             if ($OldComputerIPTextBox_NewPage.Text -ne '') {
                 $OldComputer = $OldComputerIPTextBox_NewPage.Text
-            } else {
+            }
+            else {
                 $OldComputer = $OldComputerNameTextBox_NewPage.Text
             }
 
@@ -801,18 +838,21 @@ $WallpapersXML
                         Get-USMTProgress
                         Start-Sleep -Seconds 1
                     }
-                } else {
+                }
+                else {
                     Update-Log "Save state process on $OldComputer is complete. Proceeding with migration."
                 }
-            } else {
+            }
+            else {
                 Update-Log "Unable to verify connection with $OldComputer. Migration cancelled." -Color 'Red'
                 return
             }
-        } else {
+        }
+        else {
             $OldComputer = $OldComputerNameTextBox_NewPage.Text
             Update-Log "User has verified the save state process on $OldComputer is already completed. Proceeding with migration."
         }
-		$OldComputerName = $OldComputerNameTextBox_NewPage.Text
+        $OldComputerName = $OldComputerNameTextBox_NewPage.Text
 
         # Get the location of the save state data
         $Script:Destination = "$($SaveSourceTextBox.Text)\$OldComputerName"
@@ -823,31 +863,31 @@ $WallpapersXML
             return
         }
 
-            # Clear decryption syntax in case it's already defined.
-            $DecryptionSyntax = ""
-			# Determine if Encryption has been requested
-			if ($Script:EncryptionPasswordSet -eq $True){
-                # Disable Compression
-                $Script:UncompressedSource = $false
-                $Uncompressed = ''
-				# Set the syntax for the encryption
-				$DecryptionKey = """$Script:EncryptionPassword"""
-				$DecryptionSnytax = "/decrypt /key:$DecryptionKey"
-			}
+        # Clear decryption syntax in case it's already defined.
+        $DecryptionSyntax = ""
+        # Determine if Encryption has been requested
+        if ($Script:EncryptionPasswordSet -eq $True) {
+            # Disable Compression
+            $Script:UncompressedSource = $false
+            $Uncompressed = ''
+            # Set the syntax for the encryption
+            $DecryptionKey = """$Script:EncryptionPassword"""
+            $DecryptionSnytax = "/decrypt /key:$DecryptionKey"
+        }
 
-            # Set the value to continue on error if it was specified above
-            if ($ContinueOnError -eq $True){
-                $ContinueCommand  = "/c"
-                }
-            if ($ContinueOnError -eq $false){
-                $ContinueCommand = ""
-            }
+        # Set the value to continue on error if it was specified above
+        if ($ContinueOnError -eq $True) {
+            $ContinueCommand = "/c"
+        }
+        if ($ContinueOnError -eq $false) {
+            $ContinueCommand = ""
+        }
 
-            # Set the value for the Config file if one exists.
-            if (Test-Path "$Destination\Config.xml") {
-                $LoadStateConfigFile = """$Destination\Config.xml"""
-                $LoadStateConfig = "/i:$LoadStateConfigFile"
-            }
+        # Set the value for the Config file if one exists.
+        if (Test-Path "$Destination\Config.xml") {
+            $LoadStateConfigFile = """$Destination\Config.xml"""
+            $LoadStateConfig = "/i:$LoadStateConfigFile"
+        }
 
         # Generate arguments for load state process
         $Logs = "`"/l:$Destination\load.log`" `"/progress:$Destination\load_progress.log`""
@@ -855,7 +895,8 @@ $WallpapersXML
         # Set parameter for whether save state is compressed
         if ($UncompressedSource -eq $true) {
             $Uncompressed = '/nocompress'
-        } else {
+        }
+        else {
             $Uncompressed = ''
         }
 
@@ -866,7 +907,8 @@ $WallpapersXML
             if ($Script:DefaultLACEnable -eq $true) {
                 $LocalAccountOptions += ' /lae'
             }
-        } else {
+        }
+        else {
             ''
         }
 
@@ -883,13 +925,14 @@ $WallpapersXML
 
             Update-Log "$OldUser will be migrated as $NewUser."
             $Arguments = "`"$Destination`" $LoadStateConfig $LocalAccountOptions `"/mu:$($OldUser):$NewUser`" $DecryptionSnytax $Uncompressed $Logs $ContinueCommand /v:$Script:VerboseLevel"
-        } else {
+        }
+        else {
             $Arguments = "`"$Destination`" $LoadStateConfig $LocalAccountOptions $DecryptionSnytax $Uncompressed $Logs $ContinueCommand /v:$Script:VerboseLevel"
         }
 
         # Begin loading user state to this computer
         # Create a value in order to obscure the encryption key if one was specified.
-        $LogArguments = $Arguments -Replace '/key:".*"','/key:(Hidden)'
+        $LogArguments = $Arguments -Replace '/key:".*"', '/key:(Hidden)'
         Update-Log "Command used:"
         Update-Log "$LoadState $LogArguments" -Color 'Cyan'
 
@@ -920,20 +963,23 @@ $WallpapersXML
                 Start-Process explorer
             }
 
-            if ($USMTLoadState.ExitCode -eq 0){
+            if ($USMTLoadState.ExitCode -eq 0) {
                 Update-Log "Complete!" -Color 'Green'
 
                 # Delete the save state data
                 try {
                     Get-ChildItem $MigrationStorePath | Remove-Item -Recurse
                     Update-Log 'Successfully removed old save state data.'
-                } catch {
+                }
+                catch {
                     Update-Log 'There was an issue when trying to remove old save state data.'
                 }
-            } else {
+            }
+            else {
                 update-log 'There was an issue during the loadstate process, please review the results. The state data was not deleted.'
             }
-        } catch {
+        }
+        catch {
             Update-Log $_.Exception.Message -Color 'Red'
         }
     }
@@ -959,12 +1005,14 @@ $WallpapersXML
                     $HostName = ([System.Net.Dns]::GetHostEntry($Computer)).HostName
                     $ComputerNameTextBox.Text = $HostName
                     Update-Log "Computer name set to $HostName."
-                } catch {
+                }
+                catch {
                     Update-Log "Unable to resolve host name from IP address, you'll need to manually set this." -Color 'Red'
                     return
                 }
             }
-        } elseif ($ComputerNameTextBox.Text -ne '') {
+        }
+        elseif ($ComputerNameTextBox.Text -ne '') {
             $Computer = $ComputerNameTextBox.Text
             # Try to update the computer's IP address using its DNS name
             try {
@@ -975,11 +1023,13 @@ $WallpapersXML
                 # Set IP address in text box
                 $ComputerIPTextBox.Text = $IPAddress
                 Update-Log "Computer IP address set to $IPAddress."
-            } catch {
+            }
+            catch {
                 Update-Log "Unable to resolve IP address from host name, you'll need to manually set this." -Color 'Red'
                 return
             }
-        } else {
+        }
+        else {
             $Computer = $null
         }
 
@@ -996,13 +1046,15 @@ $WallpapersXML
             if (Test-Connection $Computer -Quiet) {
                 $ConnectionCheckBox.Checked = $true
                 Update-Log "Connection established." -Color 'Green'
-            } else {
+            }
+            else {
                 Update-Log "Unable to reach $Computer." -Color 'Red'
                 if ($ComputerIPTextBox.Text -eq '') {
                     Update-Log "Try entering $Computer's IP address." -Color 'Yellow'
                 }
             }
-        } else {
+        }
+        else {
             Update-Log "Enter the computer's name or IP address."  -Color 'Red'
         }
     }
@@ -1050,18 +1102,20 @@ $WallpapersXML
 
             try {
                 $SendMailMessageParams = @{
-                    From = $EmailSenderTextBox.Text
-                    To = $EmailRecipients
-                    Subject = $EmailSubject
-                    Body = $LogTextBox.Text
-                    SmtpServer = $SMTPServerTextBox.Text
+                    From        = $EmailSenderTextBox.Text
+                    To          = $EmailRecipients
+                    Subject     = $EmailSubject
+                    Body        = $LogTextBox.Text
+                    SmtpServer  = $SMTPServerTextBox.Text
                     ErrorAction = Stop
                 }
                 Send-MailMessage @SendMailMessageParams
-            } catch {
+            }
+            catch {
                 Update-Log "Error occurred sending email: $($_.Exception.Message)" -Color 'Red'
             }
-        } else {
+        }
+        else {
             Update-Log "Unable to send email of results because SMTP server [$($SMTPServerTextBox.Text)] is unreachable." -Color 'Yellow'
         }
     }
@@ -1080,7 +1134,7 @@ $WallpapersXML
         $Script:EncryptionPasswordConfirm = Get-Credential -Message "Please confirm the encryption password" -UserName "Enter a password Below"
 
         # Convert the password strings to plain text so that they can be compared.
-        if ($Script:EncryptionPassword.Password){
+        if ($Script:EncryptionPassword.Password) {
             $Script:EncryptionPassword = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
                 [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Script:EncryptionPassword.Password))
         }
@@ -1093,9 +1147,10 @@ $WallpapersXML
         # Compare the password strings and verify that they match
         if ($Script:EncryptionPassword -ne $Script:EncryptionPasswordConfirm -or
             $Script:EncryptionPassword -eq "" -or
-            $Script:EncryptionPassword -eq $Null) {
-                Update-Log "Password did not match or was blank." -Color 'Yellow'
-        } else {
+            $null -eq $Script:EncryptionPassword) {
+            Update-Log "Password did not match or was blank." -Color 'Yellow'
+        }
+        else {
             # Set a flag that the password was successfully set
             $Script:EncryptionPasswordSet = $True
         }
@@ -1111,7 +1166,7 @@ $WallpapersXML
                 )
 
                 # Prompt again if the user opted to retry
-                if ($Script:EncryptionPasswordRetry -ne '7'){
+                if ($Script:EncryptionPasswordRetry -ne '7') {
                     Update-Log 'Retrying password prompt.' -Color Yellow
                     Read-Password
                 }
@@ -1239,11 +1294,11 @@ process {
     $NewComputerNameTextBox_OldPage.Location = New-Object System.Drawing.Size(100, 56)
     $NewComputerNameTextBox_OldPage.Size = New-Object System.Drawing.Size(120, 20)
     $NewComputerNameTextBox_OldPage.Add_TextChanged({
-        if ($ConnectionCheckBox_OldPage.Checked) {
-            Update-Log 'Computer name changed, connection status unverified.' -Color 'Yellow'
-            $ConnectionCheckBox_OldPage.Checked = $false
-        }
-    })
+            if ($ConnectionCheckBox_OldPage.Checked) {
+                Update-Log 'Computer name changed, connection status unverified.' -Color 'Yellow'
+                $ConnectionCheckBox_OldPage.Checked = $false
+            }
+        })
     $OldComputerInfoGroupBox.Controls.Add($NewComputerNameTextBox_OldPage)
 
     # New Computer IP text box
@@ -1251,11 +1306,11 @@ process {
     $NewComputerIPTextBox_OldPage.Location = New-Object System.Drawing.Size(230, 56)
     $NewComputerIPTextBox_OldPage.Size = New-Object System.Drawing.Size(90, 20)
     $NewComputerIPTextBox_OldPage.Add_TextChanged({
-        if ($ConnectionCheckBox_OldPage.Checked) {
-            Update-Log 'Computer IP address changed, connection status unverified.' -Color 'Yellow'
-            $ConnectionCheckBox_OldPage.Checked = $false
-        }
-    })
+            if ($ConnectionCheckBox_OldPage.Checked) {
+                Update-Log 'Computer IP address changed, connection status unverified.' -Color 'Yellow'
+                $ConnectionCheckBox_OldPage.Checked = $false
+            }
+        })
     $OldComputerInfoGroupBox.Controls.Add($NewComputerIPTextBox_OldPage)
 
     # Button to test connection to new computer
@@ -1264,13 +1319,13 @@ process {
     $TestConnectionButton_OldPage.Size = New-Object System.Drawing.Size(100, 22)
     $TestConnectionButton_OldPage.Text = 'Test Connection'
     $TestConnectionButton_OldPage.Add_Click({
-        $TestComputerConnectionParams = @{
-            ComputerNameTextBox = $NewComputerNameTextBox_OldPage
-            ComputerIPTextBox = $NewComputerIPTextBox_OldPage
-            ConnectionCheckBox = $ConnectionCheckBox_OldPage
-        }
-        Test-ComputerConnection @TestComputerConnectionParams
-    })
+            $TestComputerConnectionParams = @{
+                ComputerNameTextBox = $NewComputerNameTextBox_OldPage
+                ComputerIPTextBox   = $NewComputerIPTextBox_OldPage
+                ConnectionCheckBox  = $ConnectionCheckBox_OldPage
+            }
+            Test-ComputerConnection @TestComputerConnectionParams
+        })
     $OldComputerInfoGroupBox.Controls.Add($TestConnectionButton_OldPage)
 
     # Connected check box
@@ -1294,12 +1349,12 @@ process {
     $SelectProfileButton.Size = New-Object System.Drawing.Size(160, 20)
     $SelectProfileButton.Text = 'Select Profile(s) to Migrate'
     $SelectProfileButton.Add_Click({
-        Update-Log "Please wait while profiles are found..."
-        $Script:SelectedProfile = Get-UserProfiles |
-            Out-GridView -Title 'Profile Selection' -OutputMode Multiple
-        Update-Log "Profile(s) selected for migration:"
-        $Script:SelectedProfile | ForEach-Object { Update-Log $_.UserName }
-    })
+            Update-Log "Please wait while profiles are found..."
+            $Script:SelectedProfile = Get-UserProfiles |
+                Out-GridView -Title 'Profile Selection' -OutputMode Multiple
+            Update-Log "Profile(s) selected for migration:"
+            $Script:SelectedProfile | ForEach-Object { Update-Log $_.UserName }
+        })
     $SelectProfileGroupBox.Controls.Add($SelectProfileButton)
 
     # Recent profile day limit text box
@@ -1316,14 +1371,15 @@ process {
     $RecentProfilesCheckBox.Size = New-Object System.Drawing.Size(200, 40)
     $RecentProfilesCheckBox.Checked = $DefaultRecentProfiles
     $RecentProfilesCheckBox.Add_Click({
-        if ($RecentProfilesCheckBox.Checked -eq $true) {
-            Update-Log "All profiles logged into within the last $($RecentProfilesDaysTextBox.Text) days will be saved."
-            $SelectProfileButton.Enabled = $false
-        } else {
-            Update-Log "Recent profile save disabled." -Color Yellow
-            $SelectProfileButton.Enabled = $true
-        }
-    })
+            if ($RecentProfilesCheckBox.Checked -eq $true) {
+                Update-Log "All profiles logged into within the last $($RecentProfilesDaysTextBox.Text) days will be saved."
+                $SelectProfileButton.Enabled = $false
+            }
+            else {
+                Update-Log "Recent profile save disabled." -Color Yellow
+                $SelectProfileButton.Enabled = $true
+            }
+        })
     $SelectProfileGroupBox.Controls.Add($RecentProfilesCheckBox)
 
     # Alternative save location group box
@@ -1347,16 +1403,17 @@ process {
     $SaveRemotelyCheckBox.Location = New-Object System.Drawing.Size(45, 45)
     $SaveRemotelyCheckBox.Size = New-Object System.Drawing.Size(150, 20)
     $SaveRemotelyCheckBox.Add_Click({
-        if ($SaveRemotelyCheckBox.Checked -eq $true) {
-            $OldComputerInfoGroupBox.Enabled = $true
-            Update-Log 'Local save destination disabled' -Color 'Yellow' -NoNewLine
-            Update-Log ' - Save state will be stored on the new computer and network checks will be processed normally.'
-        } else {
-            $OldComputerInfoGroupBox.Enabled = $false
-            Update-Log 'Local save destination enabled' -Color 'Yellow' -NoNewLine
-            Update-Log ' - Save state will be stored locally and network checks will be skipped.'
-        }
-    })
+            if ($SaveRemotelyCheckBox.Checked -eq $true) {
+                $OldComputerInfoGroupBox.Enabled = $true
+                Update-Log 'Local save destination disabled' -Color 'Yellow' -NoNewLine
+                Update-Log ' - Save state will be stored on the new computer and network checks will be processed normally.'
+            }
+            else {
+                $OldComputerInfoGroupBox.Enabled = $false
+                Update-Log 'Local save destination enabled' -Color 'Yellow' -NoNewLine
+                Update-Log ' - Save state will be stored locally and network checks will be skipped.'
+            }
+        })
     $SaveDestinationGroupBox.Controls.Add($SaveRemotelyCheckBox)
 
     # Change save destination button
@@ -1373,9 +1430,9 @@ process {
     $ResetSaveDestinationButton.Size = New-Object System.Drawing.Size(65, 20)
     $ResetSaveDestinationButton.Text = 'Reset'
     $ResetSaveDestinationButton.Add_Click({
-        Update-Log "Resetting save directory to [$MigrationStorePath]."
-        $SaveDestinationTextBox.Text = $MigrationStorePath
-    })
+            Update-Log "Resetting save directory to [$MigrationStorePath]."
+            $SaveDestinationTextBox.Text = $MigrationStorePath
+        })
     $SaveDestinationGroupBox.Controls.Add($ResetSaveDestinationButton)
 
     # Inclusions group box
@@ -1392,17 +1449,18 @@ process {
     $IncludeAppDataCheckBox.Location = New-Object System.Drawing.Size(10, 15)
     $IncludeAppDataCheckBox.Size = New-Object System.Drawing.Size(100, 20)
     $IncludeAppDataCheckBox.Add_Click({
-        $ComponentName = $IncludeAppDataCheckBox.Text
-        if ($IncludeAppDataCheckBox.Checked -eq $true) {
-            Update-Log "$ComponentName will be included."
-            if ($SelectedXMLS) {
-                Remove-variable -Name SelectedXMLS -Scope Script -Force
-                Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+            $ComponentName = $IncludeAppDataCheckBox.Text
+            if ($IncludeAppDataCheckBox.Checked -eq $true) {
+                Update-Log "$ComponentName will be included."
+                if ($SelectedXMLS) {
+                    Remove-variable -Name SelectedXMLS -Scope Script -Force
+                    Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+                }
             }
-        } else {
-            Update-Log "$ComponentName will not be included."
-        }
-    })
+            else {
+                Update-Log "$ComponentName will not be included."
+            }
+        })
     $InclusionsGroupBox.Controls.Add($IncludeAppDataCheckBox)
 
     # Local AppData check box CSIDL_LOCAL_APPDATA
@@ -1412,17 +1470,18 @@ process {
     $IncludeLocalAppDataCheckBox.Location = New-Object System.Drawing.Size(10, 35)
     $IncludeLocalAppDataCheckBox.Size = New-Object System.Drawing.Size(100, 20)
     $IncludeLocalAppDataCheckBox.Add_Click({
-        $ComponentName = $IncludeLocalAppDataCheckBox.Text
-        if ($IncludeLocalAppDataCheckBox.Checked -eq $true) {
-            Update-Log "$ComponentName will be included."
-            if ($SelectedXMLS) {
-                Remove-variable -Name SelectedXMLS -Scope Script -Force
-                Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+            $ComponentName = $IncludeLocalAppDataCheckBox.Text
+            if ($IncludeLocalAppDataCheckBox.Checked -eq $true) {
+                Update-Log "$ComponentName will be included."
+                if ($SelectedXMLS) {
+                    Remove-variable -Name SelectedXMLS -Scope Script -Force
+                    Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+                }
             }
-        } else {
-            Update-Log "$ComponentName will not be included." -Color Yellow
-        }
-    })
+            else {
+                Update-Log "$ComponentName will not be included." -Color Yellow
+            }
+        })
     $InclusionsGroupBox.Controls.Add($IncludeLocalAppDataCheckBox)
 
     # Printers check box CSIDL_PRINTERS
@@ -1432,17 +1491,18 @@ process {
     $IncludePrintersCheckBox.Location = New-Object System.Drawing.Size(10, 55)
     $IncludePrintersCheckBox.Size = New-Object System.Drawing.Size(100, 20)
     $IncludePrintersCheckBox.Add_Click({
-        $ComponentName = $IncludePrintersCheckBox.Text
-        if ($IncludePrintersCheckBox.Checked -eq $true) {
-            Update-Log "$ComponentName will be included."
-            if ($SelectedXMLS) {
-                Remove-variable -Name SelectedXMLS -Scope Script -Force
-                Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+            $ComponentName = $IncludePrintersCheckBox.Text
+            if ($IncludePrintersCheckBox.Checked -eq $true) {
+                Update-Log "$ComponentName will be included."
+                if ($SelectedXMLS) {
+                    Remove-variable -Name SelectedXMLS -Scope Script -Force
+                    Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+                }
             }
-        } else {
-            Update-Log "$ComponentName will not be included." -Color Yellow
-        }
-    })
+            else {
+                Update-Log "$ComponentName will not be included." -Color Yellow
+            }
+        })
     $InclusionsGroupBox.Controls.Add($IncludePrintersCheckBox)
 
     # Recycle Bin check box CSIDL_BITBUCKET
@@ -1452,17 +1512,18 @@ process {
     $IncludeRecycleBinCheckBox.Location = New-Object System.Drawing.Size(10, 75)
     $IncludeRecycleBinCheckBox.Size = New-Object System.Drawing.Size(100, 20)
     $IncludeRecycleBinCheckBox.Add_Click({
-        $ComponentName = $IncludeRecycleBinCheckBox.Text
-        if ($IncludeRecycleBinCheckBox.Checked -eq $true) {
-            Update-Log "$ComponentName will be included."
-            if ($SelectedXMLS) {
-                Remove-variable -Name SelectedXMLS -Scope Script -Force
-                Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+            $ComponentName = $IncludeRecycleBinCheckBox.Text
+            if ($IncludeRecycleBinCheckBox.Checked -eq $true) {
+                Update-Log "$ComponentName will be included."
+                if ($SelectedXMLS) {
+                    Remove-variable -Name SelectedXMLS -Scope Script -Force
+                    Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+                }
             }
-        } else {
-            Update-Log "$ComponentName will not be included." -Color Yellow
-        }
-    })
+            else {
+                Update-Log "$ComponentName will not be included." -Color Yellow
+            }
+        })
     $InclusionsGroupBox.Controls.Add($IncludeRecycleBinCheckBox)
 
     # My Documents check box CSIDL_MYDOCUMENTS and CSIDL_PERSONAL
@@ -1472,17 +1533,18 @@ process {
     $IncludeMyDocumentsCheckBox.Location = New-Object System.Drawing.Size(10, 95)
     $IncludeMyDocumentsCheckBox.Size = New-Object System.Drawing.Size(100, 20)
     $IncludeMyDocumentsCheckBox.Add_Click({
-        $ComponentName = $IncludeMyDocumentsCheckBox.Text
-        if ($IncludeMyDocumentsCheckBox.Checked -eq $true) {
-            Update-Log "$ComponentName will be included."
-            if ($SelectedXMLS) {
-                Remove-variable -Name SelectedXMLS -Scope Script -Force
-                Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+            $ComponentName = $IncludeMyDocumentsCheckBox.Text
+            if ($IncludeMyDocumentsCheckBox.Checked -eq $true) {
+                Update-Log "$ComponentName will be included."
+                if ($SelectedXMLS) {
+                    Remove-variable -Name SelectedXMLS -Scope Script -Force
+                    Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+                }
             }
-        } else {
-            Update-Log "$ComponentName will not be included." -Color Yellow
-        }
-    })
+            else {
+                Update-Log "$ComponentName will not be included." -Color Yellow
+            }
+        })
     $InclusionsGroupBox.Controls.Add($IncludeMyDocumentsCheckBox)
 
     # Wallpapers
@@ -1492,17 +1554,18 @@ process {
     $IncludeWallpapersCheckBox.Location = New-Object System.Drawing.Size(10, 115)
     $IncludeWallpapersCheckBox.Size = New-Object System.Drawing.Size(100, 20)
     $IncludeWallpapersCheckBox.Add_Click({
-        $ComponentName = $IncludeWallpapersCheckBox.Text
-        if ($IncludeWallpapersCheckBox.Checked -eq $true) {
-            Update-Log "$ComponentName will be included."
-            if ($SelectedXMLS) {
-                Remove-variable -Name SelectedXMLS -Scope Script -Force
-                Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+            $ComponentName = $IncludeWallpapersCheckBox.Text
+            if ($IncludeWallpapersCheckBox.Checked -eq $true) {
+                Update-Log "$ComponentName will be included."
+                if ($SelectedXMLS) {
+                    Remove-variable -Name SelectedXMLS -Scope Script -Force
+                    Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+                }
             }
-        } else {
-            Update-Log "$ComponentName will not be included." -Color Yellow
-        }
-    })
+            else {
+                Update-Log "$ComponentName will not be included." -Color Yellow
+            }
+        })
     $InclusionsGroupBox.Controls.Add($IncludeWallpapersCheckBox)
 
     # Desktop check box CSIDL_DESKTOP and CSIDL_DESKTOPDIRECTORY
@@ -1512,17 +1575,18 @@ process {
     $IncludeDesktopCheckBox.Location = New-Object System.Drawing.Size(110, 15)
     $IncludeDesktopCheckBox.Size = New-Object System.Drawing.Size(100, 20)
     $IncludeDesktopCheckBox.Add_Click({
-        $ComponentName = $IncludeDesktopCheckBox.Text
-        if ($IncludeDesktopCheckBox.Checked -eq $true) {
-            Update-Log "$ComponentName will be included."
-            if ($SelectedXMLS) {
-                Remove-variable -Name SelectedXMLS -Scope Script -Force
-                Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+            $ComponentName = $IncludeDesktopCheckBox.Text
+            if ($IncludeDesktopCheckBox.Checked -eq $true) {
+                Update-Log "$ComponentName will be included."
+                if ($SelectedXMLS) {
+                    Remove-variable -Name SelectedXMLS -Scope Script -Force
+                    Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+                }
             }
-        } else {
-            Update-Log "$ComponentName will not be included." -Color Yellow
-        }
-    })
+            else {
+                Update-Log "$ComponentName will not be included." -Color Yellow
+            }
+        })
     $InclusionsGroupBox.Controls.Add($IncludeDesktopCheckBox)
 
     # Favorites check box CSIDL_FAVORITES
@@ -1532,17 +1596,18 @@ process {
     $IncludeFavoritesCheckBox.Location = New-Object System.Drawing.Size(110, 35)
     $IncludeFavoritesCheckBox.Size = New-Object System.Drawing.Size(100, 20)
     $IncludeFavoritesCheckBox.Add_Click({
-        $ComponentName = $IncludeFavoritesCheckBox.Text
-        if ($IncludeFavoritesCheckBox.Checked -eq $true) {
-            Update-Log "$ComponentName will be included."
-            if ($SelectedXMLS) {
-                Remove-variable -Name SelectedXMLS -Scope Script -Force
-                Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+            $ComponentName = $IncludeFavoritesCheckBox.Text
+            if ($IncludeFavoritesCheckBox.Checked -eq $true) {
+                Update-Log "$ComponentName will be included."
+                if ($SelectedXMLS) {
+                    Remove-variable -Name SelectedXMLS -Scope Script -Force
+                    Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+                }
             }
-        } else {
-            Update-Log "$ComponentName will not be included." -Color Yellow
-        }
-    })
+            else {
+                Update-Log "$ComponentName will not be included." -Color Yellow
+            }
+        })
     $InclusionsGroupBox.Controls.Add($IncludeFavoritesCheckBox)
 
     # My Music check box CSIDL_MYMUSIC
@@ -1552,17 +1617,18 @@ process {
     $IncludeMyMusicCheckBox.Location = New-Object System.Drawing.Size(110, 55)
     $IncludeMyMusicCheckBox.Size = New-Object System.Drawing.Size(100, 20)
     $IncludeMyMusicCheckBox.Add_Click({
-        $ComponentName = $IncludeMyMusicCheckBox.Text
-        if ($IncludeMyMusicCheckBox.Checked -eq $true) {
-            Update-Log "$ComponentName will be included."
-            if ($SelectedXMLS) {
-                Remove-variable -Name SelectedXMLS -Scope Script -Force
-                Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+            $ComponentName = $IncludeMyMusicCheckBox.Text
+            if ($IncludeMyMusicCheckBox.Checked -eq $true) {
+                Update-Log "$ComponentName will be included."
+                if ($SelectedXMLS) {
+                    Remove-variable -Name SelectedXMLS -Scope Script -Force
+                    Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+                }
             }
-        } else {
-            Update-Log "$ComponentName will not be included." -Color Yellow
-        }
-    })
+            else {
+                Update-Log "$ComponentName will not be included." -Color Yellow
+            }
+        })
     $InclusionsGroupBox.Controls.Add($IncludeMyMusicCheckBox)
 
     # My Pictures check box CSIDL_MYPICTURES
@@ -1572,17 +1638,18 @@ process {
     $IncludeMyPicturesCheckBox.Location = New-Object System.Drawing.Size(110, 75)
     $IncludeMyPicturesCheckBox.Size = New-Object System.Drawing.Size(100, 20)
     $IncludeMyPicturesCheckBox.Add_Click({
-        $ComponentName = $IncludeMyPicturesCheckBox.Text
-        if ($IncludeMyPicturesCheckBox.Checked -eq $true) {
-            Update-Log "$ComponentName will be included."
-            if ($SelectedXMLS) {
-                Remove-variable -Name SelectedXMLS -Scope Script -Force
-                Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+            $ComponentName = $IncludeMyPicturesCheckBox.Text
+            if ($IncludeMyPicturesCheckBox.Checked -eq $true) {
+                Update-Log "$ComponentName will be included."
+                if ($SelectedXMLS) {
+                    Remove-variable -Name SelectedXMLS -Scope Script -Force
+                    Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+                }
             }
-        } else {
-            Update-Log "$ComponentName will not be included." -Color Yellow
-        }
-    })
+            else {
+                Update-Log "$ComponentName will not be included." -Color Yellow
+            }
+        })
     $InclusionsGroupBox.Controls.Add($IncludeMyPicturesCheckBox)
 
     # My Video check box CSIDL_MYVIDEO
@@ -1592,17 +1659,18 @@ process {
     $IncludeMyVideoCheckBox.Location = New-Object System.Drawing.Size(110, 95)
     $IncludeMyVideoCheckBox.Size = New-Object System.Drawing.Size(100, 20)
     $IncludeMyVideoCheckBox.Add_Click({
-        $ComponentName = $IncludeMyVideoCheckBox.Text
-        if ($IncludeMyVideoCheckBox.Checked -eq $true) {
-            Update-Log "$ComponentName will be included."
-            if ($SelectedXMLS) {
-                Remove-variable -Name SelectedXMLS -Scope Script -Force
-                Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+            $ComponentName = $IncludeMyVideoCheckBox.Text
+            if ($IncludeMyVideoCheckBox.Checked -eq $true) {
+                Update-Log "$ComponentName will be included."
+                if ($SelectedXMLS) {
+                    Remove-variable -Name SelectedXMLS -Scope Script -Force
+                    Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+                }
             }
-        } else {
-            Update-Log "$ComponentName will not be included." -Color Yellow
-        }
-    })
+            else {
+                Update-Log "$ComponentName will not be included." -Color Yellow
+            }
+        })
     $InclusionsGroupBox.Controls.Add($IncludeMyVideoCheckBox)
 
     # Custom XML Box
@@ -1611,43 +1679,43 @@ process {
     $IncludeCustomXMLButton.Location = New-Object System.Drawing.Size(110, 115)
     $IncludeCustomXMLButton.Size = New-Object System.Drawing.Size(100, 20)
     $IncludeCustomXMLButton.Add_Click({
-        # Create an array object as well as clear any existing Custom XML list if present
-        $Script:DiscoveredXMLS = @()
-        $Script:SelectedXMLS = @()
-        Update-Log "Please wait while Custom XML Files are found..."
-        $Script:DiscoveredXMLS = Get-ChildItem "$Script:USMTPath\*.xml"  -Exclude "MigLog.xml"
+            # Create an array object as well as clear any existing Custom XML list if present
+            $Script:DiscoveredXMLS = @()
+            $Script:SelectedXMLS = @()
+            Update-Log "Please wait while Custom XML Files are found..."
+            $Script:DiscoveredXMLS = Get-ChildItem "$Script:USMTPath\*.xml"  -Exclude "MigLog.xml"
 
-        # Create a Description property
-        $Script:DiscoveredXMLS | Add-Member -NotePropertyName Description -NotePropertyValue "No Description Available"
-        foreach ($XMLFile in $Script:DiscoveredXMLS) {
-            $XMLDescriptionFile = $XmlFIle -Replace ".xml",".txt"
-            if (Test-path $XMLDescriptionFIle) {
-                $XMLDescription = get-content $XMLDescriptionFile
-                $XmlFile.Description = $XMLDescription
+            # Create a Description property
+            $Script:DiscoveredXMLS | Add-Member -NotePropertyName Description -NotePropertyValue "No Description Available"
+            foreach ($XMLFile in $Script:DiscoveredXMLS) {
+                $XMLDescriptionFile = $XmlFIle -Replace ".xml", ".txt"
+                if (Test-path $XMLDescriptionFIle) {
+                    $XMLDescription = get-content $XMLDescriptionFile
+                    $XmlFile.Description = $XMLDescription
+                }
             }
-        }
 
-        $Script:DiscoveredXMLS | Select-Object -Property Name, Description |
-            Out-GridView -Title 'Custom XML file selection' -OutputMode Multiple |
-            ForEach-Object { $Script:SelectedXMLS += $_.Name }
+            $Script:DiscoveredXMLS | Select-Object -Property Name, Description |
+                Out-GridView -Title 'Custom XML file selection' -OutputMode Multiple |
+                ForEach-Object { $Script:SelectedXMLS += $_.Name }
 
-        Update-Log "Xmls(s) selected for migration:"
-        foreach ($XML in $Script:SelectedXMLS) { Update-Log $XML }
+            Update-Log "Xmls(s) selected for migration:"
+            foreach ($XML in $Script:SelectedXMLS) { Update-Log $XML }
 
-        # Uncheck other Selections
-        $IncludeAppDataCheckBox.Checked = $False
-        $IncludeLocalAppDataCheckBox.Checked = $False
-        $IncludePrintersCheckBox.Checked = $False
-        $IncludeRecycleBinCheckBox.Checked = $False
-        $IncludeWallpapersCheckBox.Checked = $False
-        $IncludeMyDocumentsCheckBox.Checked = $False
-        $IncludeDesktopCheckBox.Checked = $False
-        $IncludeFavoritesCheckBox.Checked = $False
-        $IncludeMyMusicCheckBox.Checked = $False
-        $IncludeMyPicturesCheckBox.Checked = $False
-        $IncludeMyPicturesCheckBox.Checked = $False
-        $IncludeMyVideoCheckBox.Checked = $False
-    })
+            # Uncheck other Selections
+            $IncludeAppDataCheckBox.Checked = $False
+            $IncludeLocalAppDataCheckBox.Checked = $False
+            $IncludePrintersCheckBox.Checked = $False
+            $IncludeRecycleBinCheckBox.Checked = $False
+            $IncludeWallpapersCheckBox.Checked = $False
+            $IncludeMyDocumentsCheckBox.Checked = $False
+            $IncludeDesktopCheckBox.Checked = $False
+            $IncludeFavoritesCheckBox.Checked = $False
+            $IncludeMyMusicCheckBox.Checked = $False
+            $IncludeMyPicturesCheckBox.Checked = $False
+            $IncludeMyPicturesCheckBox.Checked = $False
+            $IncludeMyVideoCheckBox.Checked = $False
+        })
     $InclusionsGroupBox.Controls.Add($IncludeCustomXMLButton)
 
     # Extra directories selection group box
@@ -1704,19 +1772,20 @@ process {
     $ScanStateEncryptionCheckBox.Location = New-Object System.Drawing.Size(280, 340)
     $ScanStateEncryptionCheckBox.Size = New-Object System.Drawing.Size(300, 30)
     $ScanStateEncryptionCheckBox.Add_Click({
-        if ($ScanStateEncryptionCheckBox.Checked -eq $true) {
-            # Prompt for Encryption password
-            Update-Log 'Encryption for save state enabled, prompting for password.' -Color 'Yellow'
-            Read-Password
-            #Disable the use of the encryption password was not sucessfully set.
-            if ($Script:EncryptionPasswordSet -NE $True){
-                Update-Log "Encryption password was not set." -Color 'Yellow'
-                $ScanStateEncryptionCheckBox.Checked = $false
-            } else {
-                Update-Log 'Encyption password successfully set.' -Color 'LightBlue'
+            if ($ScanStateEncryptionCheckBox.Checked -eq $true) {
+                # Prompt for Encryption password
+                Update-Log 'Encryption for save state enabled, prompting for password.' -Color 'Yellow'
+                Read-Password
+                #Disable the use of the encryption password was not sucessfully set.
+                if ($Script:EncryptionPasswordSet -NE $True) {
+                    Update-Log "Encryption password was not set." -Color 'Yellow'
+                    $ScanStateEncryptionCheckBox.Checked = $false
+                }
+                else {
+                    Update-Log 'Encyption password successfully set.' -Color 'LightBlue'
+                }
             }
-        }
-    })
+        })
     $OldComputerTabPage.Controls.Add($ScanStateEncryptionCheckBox)
 
     # Uncompressed storage check box
@@ -1725,14 +1794,15 @@ process {
     $UncompressedCheckBox.Location = New-Object System.Drawing.Size(280, 370)
     $UncompressedCheckBox.Size = New-Object System.Drawing.Size(300, 30)
     $UncompressedCheckBox.Add_Click({
-        if ($UncompressedCheckBox.Checked -eq $true) {
-            Update-Log 'Uncompressed save state enabled' -Color 'Yellow' -NoNewLine
-            Update-Log ' - Save state will be stored as uncompressed flat files.'
-        } else {
-            Update-Log 'Uncompressed save state disabled' -Color 'Yellow' -NoNewLine
-            Update-Log ' - Save state will be stored as a compressed file.'
-        }
-    })
+            if ($UncompressedCheckBox.Checked -eq $true) {
+                Update-Log 'Uncompressed save state enabled' -Color 'Yellow' -NoNewLine
+                Update-Log ' - Save state will be stored as uncompressed flat files.'
+            }
+            else {
+                Update-Log 'Uncompressed save state disabled' -Color 'Yellow' -NoNewLine
+                Update-Log ' - Save state will be stored as a compressed file.'
+            }
+        })
     $OldComputerTabPage.Controls.Add($UncompressedCheckBox)
 
     # Migrate button
@@ -1778,10 +1848,10 @@ process {
     $ChangeSaveSourceButton.Size = New-Object System.Drawing.Size(60, 20)
     $ChangeSaveSourceButton.Text = 'Change'
     $ChangeSaveSourceButton.Add_Click({
-        Set-SaveDirectory -Type Source
-        $OldComputerNameTextBox_NewPage.Text = Get-SaveState
-        Show-DomainInfo
-    })
+            Set-SaveDirectory -Type Source
+            $OldComputerNameTextBox_NewPage.Text = Get-SaveState
+            Show-DomainInfo
+        })
     $SaveSourceGroupBox.Controls.Add($ChangeSaveSourceButton)
 
     # Reset save destination button
@@ -1790,11 +1860,11 @@ process {
     $ResetSaveSourceButton.Size = New-Object System.Drawing.Size(65, 20)
     $ResetSaveSourceButton.Text = 'Reset'
     $ResetSaveSourceButton.Add_Click({
-        Update-Log "Resetting save state directory to [$MigrationStorePath]."
-        $SaveSourceTextBox.Text = $MigrationStorePath
-        $OldComputerNameTextBox_NewPage.Text = Get-SaveState
-        Show-DomainInfo
-    })
+            Update-Log "Resetting save state directory to [$MigrationStorePath]."
+            $SaveSourceTextBox.Text = $MigrationStorePath
+            $OldComputerNameTextBox_NewPage.Text = Get-SaveState
+            Show-DomainInfo
+        })
     $SaveSourceGroupBox.Controls.Add($ResetSaveSourceButton)
 
     # Search for save state in given SaveSourceTextBox path
@@ -1803,9 +1873,9 @@ process {
     $ResetSaveSourceButton.Size = New-Object System.Drawing.Size(65, 20)
     $ResetSaveSourceButton.Text = 'Search'
     $ResetSaveSourceButton.Add_Click({
-        $OldComputerNameTextBox_NewPage.Text = Get-SaveState
-        Show-DomainInfo
-    })
+            $OldComputerNameTextBox_NewPage.Text = Get-SaveState
+            Show-DomainInfo
+        })
     $SaveSourceGroupBox.Controls.Add($ResetSaveSourceButton)
 
     # Name label
@@ -1842,11 +1912,11 @@ process {
     $OldComputerIPTextBox_NewPage.Location = New-Object System.Drawing.Size(230, 34)
     $OldComputerIPTextBox_NewPage.Size = New-Object System.Drawing.Size(90, 20)
     $OldComputerIPTextBox_NewPage.Add_TextChanged({
-        if ($ConnectionCheckBox_NewPage.Checked) {
-            Update-Log 'Computer IP address changed, connection status unverified.' -Color 'Yellow'
-            $ConnectionCheckBox_NewPage.Checked = $false
-        }
-    })
+            if ($ConnectionCheckBox_NewPage.Checked) {
+                Update-Log 'Computer IP address changed, connection status unverified.' -Color 'Yellow'
+                $ConnectionCheckBox_NewPage.Checked = $false
+            }
+        })
     $NewComputerInfoGroupBox.Controls.Add($OldComputerIPTextBox_NewPage)
 
     # New Computer name label
@@ -1878,13 +1948,13 @@ process {
     $TestConnectionButton_NewPage.Size = New-Object System.Drawing.Size(100, 22)
     $TestConnectionButton_NewPage.Text = 'Test Connection'
     $TestConnectionButton_NewPage.Add_Click({
-        $TestComputerConnectionParams = @{
-            ComputerNameTextBox = $OldComputerNameTextBox_NewPage
-            ComputerIPTextBox = $OldComputerIPTextBox_NewPage
-            ConnectionCheckBox = $ConnectionCheckBox_NewPage
-        }
-        Test-ComputerConnection @TestComputerConnectionParams
-    })
+            $TestComputerConnectionParams = @{
+                ComputerNameTextBox = $OldComputerNameTextBox_NewPage
+                ComputerIPTextBox   = $OldComputerIPTextBox_NewPage
+                ConnectionCheckBox  = $ConnectionCheckBox_NewPage
+            }
+            Test-ComputerConnection @TestComputerConnectionParams
+        })
     $NewComputerInfoGroupBox.Controls.Add($TestConnectionButton_NewPage)
 
     # Connected check box
@@ -1973,7 +2043,7 @@ process {
     $NewUserNameTextBox = New-Object System.Windows.Forms.TextBox
     $NewUserNameTextBox.Location = New-Object System.Drawing.Size(125, 56)
     $NewUserNameTextBox.Size = New-Object System.Drawing.Size(80, 20)
-	$NewUserNameTextBox.Text = $env:USERNAME
+    $NewUserNameTextBox.Text = $env:USERNAME
     $CrossDomainMigrationGroupBox.Controls.Add($NewUserNameTextBox)
 
     # Override check box
@@ -1982,16 +2052,17 @@ process {
     $OverrideCheckBox.Location = New-Object System.Drawing.Size(280, 225)
     $OverrideCheckBox.Size = New-Object System.Drawing.Size(300, 30)
     $OverrideCheckBox.Add_Click({
-        if ($OverrideCheckBox.Checked -eq $true) {
-            $NewComputerInfoGroupBox.Enabled = $false
-            Update-Log 'Network connection override enabled' -Color 'Yellow' -NoNewLine
-            Update-Log ' - Save state process on old computer is assumed to be completed and no network checks will be processed during load state.'
-        } else {
-            $NewComputerInfoGroupBox.Enabled = $true
-            Update-Log 'Network connection override enabled' -Color 'Yellow' -NoNewLine
-            Update-Log ' - Network checks will be processed during load state.'
-        }
-    })
+            if ($OverrideCheckBox.Checked -eq $true) {
+                $NewComputerInfoGroupBox.Enabled = $false
+                Update-Log 'Network connection override enabled' -Color 'Yellow' -NoNewLine
+                Update-Log ' - Save state process on old computer is assumed to be completed and no network checks will be processed during load state.'
+            }
+            else {
+                $NewComputerInfoGroupBox.Enabled = $true
+                Update-Log 'Network connection override enabled' -Color 'Yellow' -NoNewLine
+                Update-Log ' - Network checks will be processed during load state.'
+            }
+        })
     $NewComputerTabPage.Controls.Add($OverrideCheckBox)
 
     # LoadState Encryption check box
@@ -2000,19 +2071,20 @@ process {
     $LoadStateEncryptionCheckBox.Location = New-Object System.Drawing.Size(280, 250)
     $LoadStateEncryptionCheckBox.Size = New-Object System.Drawing.Size(300, 30)
     $LoadStateEncryptionCheckBox.Add_Click({
-        if ($LoadStateEncryptionCheckBox.Checked -eq $true) {
-            # Prompt for Encryption password
-            Update-Log 'Encryption for load state enabled, prompting for password.' -Color 'Yellow'
-            Read-Password
-            # Disable the use of the encryption password was not sucessfully set.
-            if ($Script:EncryptionPasswordSet -NE $True){
-                Update-Log 'Encryption password was not set.' -Color 'Yellow'
-                $LoadStateEncryptionCheckBox.Checked = $false
-            } else {
-                Update-Log 'Encyption password successfully set.' -Color 'LightBlue'
+            if ($LoadStateEncryptionCheckBox.Checked -eq $true) {
+                # Prompt for Encryption password
+                Update-Log 'Encryption for load state enabled, prompting for password.' -Color 'Yellow'
+                Read-Password
+                # Disable the use of the encryption password was not sucessfully set.
+                if ($Script:EncryptionPasswordSet -NE $True) {
+                    Update-Log 'Encryption password was not set.' -Color 'Yellow'
+                    $LoadStateEncryptionCheckBox.Checked = $false
+                }
+                else {
+                    Update-Log 'Encyption password successfully set.' -Color 'LightBlue'
+                }
             }
-        }
-    })
+        })
     $NewComputerTabPage.Controls.Add($LoadStateEncryptionCheckBox)
 
     Show-DomainInfo
@@ -2040,14 +2112,15 @@ process {
     $EmailCheckBox.Size = New-Object System.Drawing.Size(300, 30)
     $EmailCheckBox.Checked = $DefaultEmailEnabled
     $EmailCheckBox.Add_Click({
-        if ($EmailCheckBox.Checked -eq $true) {
-            Update-Log 'Email enabled' -Color 'Yellow' -NoNewLine
-            Update-Log ' - Results will be emailed to supplied email addresses (if your account has email relay access).'
-        } else {
-            Update-Log 'Email disabled' -Color 'Yellow' -NoNewLine
-            Update-Log ' - No results will be emailed.'
-        }
-    })
+            if ($EmailCheckBox.Checked -eq $true) {
+                Update-Log 'Email enabled' -Color 'Yellow' -NoNewLine
+                Update-Log ' - Results will be emailed to supplied email addresses (if your account has email relay access).'
+            }
+            else {
+                Update-Log 'Email disabled' -Color 'Yellow' -NoNewLine
+                Update-Log ' - No results will be emailed.'
+            }
+        })
     $EmailSettingsTabPage.Controls.Add($EmailCheckBox)
 
     # SMTP server group box
@@ -2070,15 +2143,16 @@ process {
     $SMTPConnectionButton.Size = New-Object System.Drawing.Size(100, 22)
     $SMTPConnectionButton.Text = 'Test Connection'
     $SMTPConnectionButton.Add_Click({
-        Update-Log "Testing connection to [$($SMTPServerTextBox.Text)]..." -NoNewLine
-        if (Test-Connection $SMTPServerTextBox.Text -Quiet) {
-            Update-Log "reachable."
-            $SMTPConnectionCheckBox.Checked = $true
-        } else {
-            Update-Log "unreachable." -Color 'Yellow'
-            $SMTPConnectionCheckBox.Checked = $false
-        }
-    })
+            Update-Log "Testing connection to [$($SMTPServerTextBox.Text)]..." -NoNewLine
+            if (Test-Connection $SMTPServerTextBox.Text -Quiet) {
+                Update-Log "reachable."
+                $SMTPConnectionCheckBox.Checked = $true
+            }
+            else {
+                Update-Log "unreachable." -Color 'Yellow'
+                $SMTPConnectionCheckBox.Checked = $false
+            }
+        })
     $SMTPServerGroupBox.Controls.Add($SMTPConnectionButton)
 
     # SMTP server reachable check box
@@ -2093,7 +2167,8 @@ process {
     if ($DefaultEmailEnabled -and -not (Test-Connection -ComputerName $SMTPServerTextBox.Text -Quiet)) {
         Update-Log "Email disabled because SMTP server [$($SMTPServerTextBox.Text)] is unreachable." -Color 'Yellow'
         $SMTPConnectionCheckBox.Checked = $false
-    } elseif ($DefaultEmailEnabled -and (Test-Connection -ComputerName $SMTPServerTextBox.Text -Quiet)) {
+    }
+    elseif ($DefaultEmailEnabled -and (Test-Connection -ComputerName $SMTPServerTextBox.Text -Quiet)) {
         Update-Log "SMTP server [$($SMTPServerTextBox.Text)] is reachable."
         $SMTPConnectionCheckBox.Checked = $true
     }
@@ -2144,12 +2219,12 @@ process {
     $RemoveEmailRecipientButton.Text = '-'
     $RemoveEmailRecipientButton.Font = 'Consolas, 14'
     $RemoveEmailRecipientButton.Add_Click({
-        # Remove selected cell from Email Recipients data grid view
-        $CurrentCell = $EmailRecipientsDataGridView.CurrentCell
-        Update-Log "Removed [$($CurrentCell.Value)] from email recipients."
-        $CurrentRow = $EmailRecipientsDataGridView.Rows[$CurrentCell.RowIndex]
-        $EmailRecipientsDataGridView.Rows.Remove($CurrentRow)
-    })
+            # Remove selected cell from Email Recipients data grid view
+            $CurrentCell = $EmailRecipientsDataGridView.CurrentCell
+            Update-Log "Removed [$($CurrentCell.Value)] from email recipients."
+            $CurrentRow = $EmailRecipientsDataGridView.Rows[$CurrentCell.RowIndex]
+            $EmailRecipientsDataGridView.Rows.Remove($CurrentRow)
+        })
     $EmailRecipientsDataGridView.Controls.Add($RemoveEmailRecipientButton)
 
     # Add email recipient button
@@ -2159,9 +2234,9 @@ process {
     $AddEmailRecipientButton.Text = '+'
     $AddEmailRecipientButton.Font = 'Consolas, 14'
     $AddEmailRecipientButton.Add_Click({
-        Update-Log "Adding to email recipients: $($EmailRecipientToAddTextBox.Text)."
-        $EmailRecipientsDataGridView.Rows.Add($EmailRecipientToAddTextBox.Text)
-    })
+            Update-Log "Adding to email recipients: $($EmailRecipientToAddTextBox.Text)."
+            $EmailRecipientsDataGridView.Rows.Add($EmailRecipientToAddTextBox.Text)
+        })
     $EmailRecipientsDataGridView.Controls.Add($AddEmailRecipientButton)
 
     # Email recipient to add text box
@@ -2223,12 +2298,12 @@ process {
     $RemoveOldComputerScriptButton.Text = '-'
     $RemoveOldComputerScriptButton.Font = 'Consolas, 14'
     $RemoveOldComputerScriptButton.Add_Click({
-        # Remove selected cell from new computer scripts data grid view
-        $CurrentCell = $NewComputerScriptsDataGridView.CurrentCell
-        Update-Log "Removed [$($CurrentCell.Value)] from old computer scripts."
-        $CurrentRow = $NewComputerScriptsDataGridView.Rows[$CurrentCell.RowIndex]
-        $NewComputerScriptsDataGridView.Rows.Remove($CurrentRow)
-    })
+            # Remove selected cell from new computer scripts data grid view
+            $CurrentCell = $NewComputerScriptsDataGridView.CurrentCell
+            Update-Log "Removed [$($CurrentCell.Value)] from old computer scripts."
+            $CurrentRow = $NewComputerScriptsDataGridView.Rows[$CurrentCell.RowIndex]
+            $NewComputerScriptsDataGridView.Rows.Remove($CurrentRow)
+        })
     $OldComputerScriptsDataGridView.Controls.Add($RemoveOldComputerScriptButton)
 
     # New computer scripts selection group box
@@ -2267,12 +2342,12 @@ process {
     $RemoveNewComputerScriptButton.Text = '-'
     $RemoveNewComputerScriptButton.Font = 'Consolas, 14'
     $RemoveNewComputerScriptButton.Add_Click({
-        # Remove selected cell from new computer scripts data grid view
-        $CurrentCell = $NewComputerScriptsDataGridView.CurrentCell
-        Update-Log "Removed [$($CurrentCell.Value)] from new computer scripts."
-        $CurrentRow = $NewComputerScriptsDataGridView.Rows[$CurrentCell.RowIndex]
-        $NewComputerScriptsDataGridView.Rows.Remove($CurrentRow)
-    })
+            # Remove selected cell from new computer scripts data grid view
+            $CurrentCell = $NewComputerScriptsDataGridView.CurrentCell
+            Update-Log "Removed [$($CurrentCell.Value)] from new computer scripts."
+            $CurrentRow = $NewComputerScriptsDataGridView.Rows[$CurrentCell.RowIndex]
+            $NewComputerScriptsDataGridView.Rows.Remove($CurrentRow)
+        })
     $NewComputerScriptsDataGridView.Controls.Add($RemoveNewComputerScriptButton)
 
     # Debug button
@@ -2280,13 +2355,14 @@ process {
     $DebugLabel.Location = New-Object System.Drawing.Size(974, 495)
     $DebugLabel.Size = New-Object System.Drawing.Size(10, 15)
     $DebugLabel.Text = '?'
-    $DebugLabel.Add_Click({
-        if ($TabControl.SelectedIndex -eq 0) {
-            Save-UserState -Debug
-        } elseif ($TabControl.SelectedIndex -eq 1) {
-            Restore-UserState -Debug
-        }
-    })
+    $DebugLabel.Add_Click( {
+            if ($TabControl.SelectedIndex -eq 0) {
+                Save-UserState -Debug
+            }
+            elseif ($TabControl.SelectedIndex -eq 1) {
+                Restore-UserState -Debug
+            }
+        })
     $Form.Controls.Add($DebugLabel)
 
     # Test if user is using an admin account
@@ -2299,6 +2375,6 @@ process {
     Get-USMT
 
     # Show our form
-    $Form.Add_Shown({$Form.Activate()})
+    $Form.Add_Shown( {$Form.Activate()})
     $Form.ShowDialog() | Out-Null
 }
