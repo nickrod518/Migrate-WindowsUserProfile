@@ -13,7 +13,7 @@ USMT environmental variables: https://technet.microsoft.com/en-us/library/cc7491
 
 begin {
     # Define the script version
-    $ScriptVersion = "3.3.4"
+    $ScriptVersion = "3.4.4"
 
     # Set ScripRoot variable to the path which the script is executed from
     $ScriptRoot = if ($PSVersionTable.PSVersion.Major -lt 3) {
