@@ -253,6 +253,7 @@ begin {
                     "<pattern type=`"File`">%CSIDL_DESKTOP%\* [*]</pattern>`n"
                     "<pattern type=`"File`">%CSIDL_DESKTOPDIRECTORY%\* [*]</pattern>`n"
                 }
+                if (-not $IncludeDownloadsCheckBox.Checked) { "<pattern type=`"File`">%CSIDL_DOWNLOADS%\* [*]</pattern>`n" }
                 if (-not $IncludeFavoritesCheckBox.Checked) { "<pattern type=`"File`">%CSIDL_FAVORITES%\* [*]</pattern>`n" }
                 if (-not $IncludeMyMusicCheckBox.Checked) { "<pattern type=`"File`">%CSIDL_MYMUSIC%\* [*]</pattern>`n" }
                 if (-not $IncludeMyPicturesCheckBox.Checked) { "<pattern type=`"File`">%CSIDL_MYPICTURES%\* [*]</pattern>`n" }
@@ -1572,7 +1573,7 @@ process {
     $IncludeDesktopCheckBox = New-Object System.Windows.Forms.CheckBox
     $IncludeDesktopCheckBox.Checked = $DefaultIncludeDesktop
     $IncludeDesktopCheckBox.Text = 'Desktop'
-    $IncludeDesktopCheckBox.Location = New-Object System.Drawing.Size(110, 15)
+    $IncludeDesktopCheckBox.Location = New-Object System.Drawing.Size(110, 115)
     $IncludeDesktopCheckBox.Size = New-Object System.Drawing.Size(100, 20)
     $IncludeDesktopCheckBox.Add_Click({
             $ComponentName = $IncludeDesktopCheckBox.Text
@@ -1588,6 +1589,27 @@ process {
             }
         })
     $InclusionsGroupBox.Controls.Add($IncludeDesktopCheckBox)
+
+    # Downloads check box CSIDL_DOWNLOADS
+    $IncludeDownloadsCheckBox = New-Object System.Windows.Forms.CheckBox
+    $IncludeDownloadsCheckBox.Checked = $DefaultIncludeDownloads
+    $IncludeDownloadsCheckBox.Text = 'Downloads'
+    $IncludeDownloadsCheckBox.Location = New-Object System.Drawing.Size(110, 15)
+    $IncludeDownloadsCheckBox.Size = New-Object System.Drawing.Size(100, 20)
+    $IncludeDownloadsCheckBox.Add_Click({
+            $ComponentName = $IncludeDownloadsCheckBox.Text
+            if ($IncludeDownloadsCheckBox.Checked -eq $true) {
+                Update-Log "$ComponentName will be included."
+                if ($SelectedXMLS) {
+                    Remove-variable -Name SelectedXMLS -Scope Script -Force
+                    Update-Log "Checkbox selection was made, removed Custom XML list." -Color Yellow
+                }
+            }
+            else {
+                Update-Log "$ComponentName will not be included." -Color Yellow
+            }
+        })
+    $InclusionsGroupBox.Controls.Add($IncludeDownloadsCheckBox)
 
     # Favorites check box CSIDL_FAVORITES
     $IncludeFavoritesCheckBox = New-Object System.Windows.Forms.CheckBox
@@ -1676,7 +1698,7 @@ process {
     # Custom XML Box
     $IncludeCustomXMLButton = New-Object System.Windows.Forms.Button
     $IncludeCustomXMLButton.Text = 'Custom XML(s)'
-    $IncludeCustomXMLButton.Location = New-Object System.Drawing.Size(110, 115)
+    $IncludeCustomXMLButton.Location = New-Object System.Drawing.Size(300, 325)
     $IncludeCustomXMLButton.Size = New-Object System.Drawing.Size(100, 20)
     $IncludeCustomXMLButton.Add_Click({
             # Create an array object as well as clear any existing Custom XML list if present
@@ -1716,7 +1738,7 @@ process {
             $IncludeMyPicturesCheckBox.Checked = $False
             $IncludeMyVideoCheckBox.Checked = $False
         })
-    $InclusionsGroupBox.Controls.Add($IncludeCustomXMLButton)
+    $OldComputerTabPage.Controls.Add($IncludeCustomXMLButton)
 
     # Extra directories selection group box
     $ExtraDirectoriesGroupBox = New-Object System.Windows.Forms.GroupBox
@@ -1769,7 +1791,7 @@ process {
     # Scanstate Encryption check box
     $ScanStateEncryptionCheckBox = New-Object System.Windows.Forms.CheckBox
     $ScanStateEncryptionCheckBox.Text = 'Encrypt captured Data.'
-    $ScanStateEncryptionCheckBox.Location = New-Object System.Drawing.Size(280, 340)
+    $ScanStateEncryptionCheckBox.Location = New-Object System.Drawing.Size(280, 345)
     $ScanStateEncryptionCheckBox.Size = New-Object System.Drawing.Size(300, 30)
     $ScanStateEncryptionCheckBox.Add_Click({
             if ($ScanStateEncryptionCheckBox.Checked -eq $true) {

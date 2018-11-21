@@ -35,6 +35,7 @@ $DefaultIncludeRecycleBin = $false
 $DefaultIncludeMyDocuments = $true
 $DefaultIncludeWallpapers = $true
 $DefaultIncludeDesktop = $true
+$DefaultIncludeDownloads = $true
 $DefaultIncludeFavorites = $true
 $DefaultIncludeMyMusic = $true
 $DefaultIncludeMyPictures = $true
