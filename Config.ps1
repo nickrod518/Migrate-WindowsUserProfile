@@ -49,11 +49,14 @@ $DefaultRecentProfiles = $true
 $DefaultRecentProfilesDays = 90
 
 # Get USMT binary path according to OS architecture. If you used the zip provided, unzip in the same directory as this script
-if ((Get-WmiObject Win32_OperatingSystem).OSArchitecture -match '64') {
+$Arch = (Get-WmiObject Win32_OperatingSystem).OSArchitecture
+if ($Arch -match '64') {
     $USMTPath = "$ScriptRoot\USMT\amd64"
+} elseif ($Arch -match '86') {
+    $USMTPath = "$ScriptRoot\USMT\x86"
 }
 else {
-    $USMTPath = "$ScriptRoot\USMT\x86"
+    $USMTPath = "$ScriptRoot\USMT\arm64"
 }
 
 # Define whether to continue on errors such as file already exists during restore or read issue during capture.
