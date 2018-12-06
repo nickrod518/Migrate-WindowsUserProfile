@@ -1108,7 +1108,7 @@ $WallpapersXML
                     Subject     = $EmailSubject
                     Body        = $LogTextBox.Text
                     SmtpServer  = $SMTPServerTextBox.Text
-                    ErrorAction = Stop
+                    ErrorAction = 'Stop'
                 }
                 Send-MailMessage @SendMailMessageParams
             }
