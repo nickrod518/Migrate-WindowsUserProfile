@@ -1176,8 +1176,8 @@ $WallpapersXML
         }
     }
 
-    # Hide parent PowerShell window unless run from ISE
-    if (-not $(Test-IsISE)) {
+    # Hide parent PowerShell window unless run from ISE or set $HidePowershellWindow to false
+    if ((-not $(Test-IsISE)) -and ($HidePowershellWindow) ) {
         $ShowWindowAsync = Add-Type -MemberDefinition @"
     [DllImport("user32.dll")]
 public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
