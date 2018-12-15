@@ -2310,7 +2310,9 @@ process {
     $OldComputerScripts = Get-ChildItem -Path "$PSScriptRoot\Scripts\OldComputer" |
         Where-Object { -not $_.PSIsContainer }
     foreach ($Script in $OldComputerScripts) {
-        $OldComputerScriptsDataGridView.Rows.Add($Script)
+        if (!($Script.Contains(".gitignore"))){
+            $OldComputerScriptsDataGridView.Rows.Add($Script)
+        }
     }
 
     # Remove old computer script button
@@ -2354,7 +2356,9 @@ process {
     $NewComputerScripts = Get-ChildItem -Path "$PSScriptRoot\Scripts\NewComputer" |
         Where-Object { -not $_.PSIsContainer }
     foreach ($Script in $NewComputerScripts) {
-        $NewComputerScriptsDataGridView.Rows.Add($Script)
+        if (!($Script.Contains(".gitignore"))){
+            $NewComputerScriptsDataGridView.Rows.Add($Script)
+        }
     }
 
     # Remove new computer script button
