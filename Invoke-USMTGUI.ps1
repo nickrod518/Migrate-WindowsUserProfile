@@ -24,7 +24,7 @@ begin {
     }
 
     # Load the options in the Config file
-    . "$ScriptRoot\Config.ps1"
+    . "$ScriptRoot\USMT\Config.ps1"
 
     # Set a value for the wscript comobject
     $WScriptShell = New-Object -ComObject wscript.shell
@@ -582,7 +582,7 @@ $WallpapersXML
         # Run scripts before doing actual data migration
         $OldComputerScriptsDataGridView.Rows | ForEach-Object {
             $ScriptName = $OldComputerScriptsDataGridView.Item(0, $_.Index).Value
-            $ScriptPath = "$PSScriptRoot\Scripts\OldComputer\$ScriptName"
+            $ScriptPath = "$PSScriptRoot\USMT\Scripts\OldComputer\$ScriptName"
             Update-Log "Running $ScriptPath"
             if (-not $Debug) {
                 $Result = if ($ScriptPath.EndsWith('ps1')) {
@@ -796,7 +796,7 @@ $WallpapersXML
         # Run scripts before doing actual data migration
         $NewComputerScriptsDataGridView.Rows | ForEach-Object {
             $ScriptName = $NewComputerScriptsDataGridView.Item(0, $_.Index).Value
-            $ScriptPath = "$PSScriptRoot\Scripts\NewComputer\$ScriptName"
+            $ScriptPath = "$PSScriptRoot\USMT\Scripts\NewComputer\$ScriptName"
             Update-Log "Running $ScriptPath"
             if (-not $Debug) {
                 $Result = if ($ScriptPath.EndsWith('ps1')) {
@@ -2307,7 +2307,7 @@ process {
     $OldComputerScriptsGroupBox.Controls.Add($OldComputerScriptsDataGridView)
 
     # Add old computer script to data grid view
-    $OldComputerScripts = Get-ChildItem -Path "$PSScriptRoot\Scripts\OldComputer" |
+    $OldComputerScripts = Get-ChildItem -Path "$PSScriptRoot\USMT\Scripts\OldComputer" |
         Where-Object { -not $_.PSIsContainer }
     foreach ($Script in $OldComputerScripts) {
         if (!($Script.Contains(".gitignore"))){
@@ -2353,7 +2353,7 @@ process {
     $NewComputerScriptsGroupBox.Controls.Add($NewComputerScriptsDataGridView)
 
     # Add new computer script to data grid view
-    $NewComputerScripts = Get-ChildItem -Path "$PSScriptRoot\Scripts\NewComputer" |
+    $NewComputerScripts = Get-ChildItem -Path "$PSScriptRoot\USMT\Scripts\NewComputer" |
         Where-Object { -not $_.PSIsContainer }
     foreach ($Script in $NewComputerScripts) {
         if (!($Script.Contains(".gitignore"))){
