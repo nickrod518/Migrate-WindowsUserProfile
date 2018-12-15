@@ -1176,8 +1176,8 @@ $WallpapersXML
         }
     }
 
-    # Hide parent PowerShell window unless run from ISE
-    if (-not $(Test-IsISE)) {
+    # Hide parent PowerShell window unless run from ISE or set $HidePowershellWindow to false
+    if ((-not $(Test-IsISE)) -and ($HidePowershellWindow) ) {
         $ShowWindowAsync = Add-Type -MemberDefinition @"
     [DllImport("user32.dll")]
 public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
@@ -2310,7 +2310,9 @@ process {
     $OldComputerScripts = Get-ChildItem -Path "$PSScriptRoot\Scripts\OldComputer" |
         Where-Object { -not $_.PSIsContainer }
     foreach ($Script in $OldComputerScripts) {
-        $OldComputerScriptsDataGridView.Rows.Add($Script)
+        if (!($Script.Contains(".gitignore"))){
+            $OldComputerScriptsDataGridView.Rows.Add($Script)
+        }
     }
 
     # Remove old computer script button
@@ -2354,7 +2356,9 @@ process {
     $NewComputerScripts = Get-ChildItem -Path "$PSScriptRoot\Scripts\NewComputer" |
         Where-Object { -not $_.PSIsContainer }
     foreach ($Script in $NewComputerScripts) {
-        $NewComputerScriptsDataGridView.Rows.Add($Script)
+        if (!($Script.Contains(".gitignore"))){
+            $NewComputerScriptsDataGridView.Rows.Add($Script)
+        }
     }
 
     # Remove new computer script button

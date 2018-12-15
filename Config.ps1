@@ -73,6 +73,9 @@ $ContinueOnError = $true
 13 Enables verbose, status, and debugger output. #>
 $VerboseLevel = 13
 
+# Define wether to hide the powershell window. If you call from ISE it will always not hide
+$HidePowershellWindow = $true
+
 # Define how to handle EFS format files. Options are abort (default behaviour), skip, decryptcopy, copyraw
 $EFSHandling = "abort"
 
