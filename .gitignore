@@ -1,2 +1,4 @@
 .vscode/
-USMT*/
+USMT/amd64
+USMT/arm64
+USMT/x86
