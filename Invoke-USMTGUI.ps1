@@ -2073,6 +2073,7 @@ process {
     $OverrideCheckBox.Text = 'Save state task completed'
     $OverrideCheckBox.Location = New-Object System.Drawing.Size(280, 225)
     $OverrideCheckBox.Size = New-Object System.Drawing.Size(300, 30)
+    $OverrideCheckBox.Checked = $DefaultSaveStateTaskCompleted
     $OverrideCheckBox.Add_Click({
             if ($OverrideCheckBox.Checked -eq $true) {
                 $NewComputerInfoGroupBox.Enabled = $false
@@ -2310,7 +2311,7 @@ process {
     $OldComputerScripts = Get-ChildItem -Path "$PSScriptRoot\USMT\Scripts\OldComputer" |
         Where-Object { -not $_.PSIsContainer }
     foreach ($Script in $OldComputerScripts) {
-        if (!($Script.Contains(".gitignore"))){
+        if (!($Script.Name.Contains(".gitignore"))){
             $OldComputerScriptsDataGridView.Rows.Add($Script)
         }
     }
@@ -2356,7 +2357,7 @@ process {
     $NewComputerScripts = Get-ChildItem -Path "$PSScriptRoot\USMT\Scripts\NewComputer" |
         Where-Object { -not $_.PSIsContainer }
     foreach ($Script in $NewComputerScripts) {
-        if (!($Script.Contains(".gitignore"))){
+        if (!($Script.Name.Contains(".gitignore"))){
             $NewComputerScriptsDataGridView.Rows.Add($Script)
         }
     }

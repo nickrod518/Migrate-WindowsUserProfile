@@ -4,17 +4,18 @@ Migrate Windows user profile to a new machine using Microsoft USMT with a PowerS
 ## Setup
 This requires that the USMT binaries are already present on the machine or a network accessible location. The easiest way to acquire these is to download and install the Windows ADK from https://developer.microsoft.com/en-us/windows/hardware/windows-assessment-deployment-kit, and browse to the folder that contains scanstate.exe and loadstate.exe (usually C:\Program Files (x86)\Windows Kits\10\Assessment and Deployment Kit\User State Migration Tool), and make a copy. For convenience sake, I've made the binaries available in a zip file in this repo. Unzip the USMT.zip and place the amd64, arm64, and x86 folders inside USMT. This will make the USMT folder look like below.
 
-USMT\
-    amd64\
-    arm65\
-    Scripts\
-    x86\
-    Config.ps1
-
+.
++-- Invoke-USMTGUI.ps1
++-- USMT\
+|   +-- amd64\
+|   +-- arm64\
+|   +-- Scripts\
+|   +-- x86\
+|   +-- Config.ps1
 
 Review the USMT\Config.ps1 file and make any changes to fit your needs.
 
-I recommend using my Create-EXEFromPS1 (https://github.com/nickrod518/Create-EXEFromPS1) to package the prepped migration tool for portability and ease of use. When you have installed the module you may package the project using the following command from an admin powershell session.
+I recommend using my Create-EXEFromPS1 (https://github.com/nickrod518/Create-EXEFromPS1) to package the prepped migration tool for portability and ease of use. When you have [installed the module](https://docs.microsoft.com/en-us/powershell/developer/module/installing-a-powershell-module) you may package the project using the following command from an admin powershell session.
 
 `New-EXEFromPS1 -PSScriptPath $PathToProject\Invoke-USMTGUI.ps1 -SupplementalDirectoryPath $PathToProject\USMT\`
 

@@ -44,6 +44,9 @@ $DefaultIncludeMyVideo = $true
 # Default extra directories to include
 $DefaultExtraDirectories = @()
 
+# Default value for SaveStateTaskCompleted on the Restore Tab
+$DefaultSaveStateTaskCompleted = $true
+
 # Default recent profiles
 $DefaultRecentProfiles = $true
 $DefaultRecentProfilesDays = 90
