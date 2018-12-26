@@ -1186,8 +1186,10 @@ public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
     }
 
     # Load assemblies for building forms
-    [System.Reflection.Assembly]::LoadWithPartialName("System.Drawing") | Out-Null
-    [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") | Out-Null
+    # [System.Reflection.Assembly]::LoadWithPartialName("System.Drawing") | Out-Null
+    # [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") | Out-Null
+    Add-Type -AssemblyName System.Windows.Forms
+    Add-Type -AssemblyName System.Drawing
 
     $Script:Destination = ''
 }
@@ -1198,9 +1200,11 @@ process {
     $Form.Text = 'Migration Assistant by Nick Rodriguez'
     $Form.Size = New-Object System.Drawing.Size(1000, 550)
     $Form.SizeGripStyle = 'Hide'
-    $Form.FormBorderStyle = 'FixedToolWindow'
+    $Form.FormBorderStyle = 'FixedSingle'
     $Form.MaximizeBox = $false
     $Form.StartPosition = "CenterScreen"
+    $Icon = [system.drawing.icon]::ExtractAssociatedIcon($PSHOME + "\powershell.exe")
+    $Form.Icon = $Icon
 
     # Create tab controls
     $TabControl = New-object System.Windows.Forms.TabControl
@@ -1319,6 +1323,7 @@ process {
     $TestConnectionButton_OldPage.Location = New-Object System.Drawing.Size(335, 33)
     $TestConnectionButton_OldPage.Size = New-Object System.Drawing.Size(100, 22)
     $TestConnectionButton_OldPage.Text = 'Test Connection'
+    $TestConnectionButton_OldPage.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $TestConnectionButton_OldPage.Add_Click({
             $TestComputerConnectionParams = @{
                 ComputerNameTextBox = $NewComputerNameTextBox_OldPage
@@ -1335,6 +1340,7 @@ process {
     $ConnectionCheckBox_OldPage.Text = 'Connected'
     $ConnectionCheckBox_OldPage.Location = New-Object System.Drawing.Size(336, 58)
     $ConnectionCheckBox_OldPage.Size = New-Object System.Drawing.Size(100, 20)
+    $ConnectionCheckBox_OldPage.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $OldComputerInfoGroupBox.Controls.Add($ConnectionCheckBox_OldPage)
 
     # Profile selection group box
@@ -1349,6 +1355,7 @@ process {
     $SelectProfileButton.Location = New-Object System.Drawing.Size(30, 20)
     $SelectProfileButton.Size = New-Object System.Drawing.Size(160, 20)
     $SelectProfileButton.Text = 'Select Profile(s) to Migrate'
+    $SelectProfileButton.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $SelectProfileButton.Add_Click({
             Update-Log "Please wait while profiles are found..."
             $Script:SelectedProfile = Get-UserProfiles |
@@ -1363,6 +1370,7 @@ process {
     $RecentProfilesDaysTextBox.Location = New-Object System.Drawing.Size(165, 70)
     $RecentProfilesDaysTextBox.Size = New-Object System.Drawing.Size(40, 20)
     $RecentProfilesDaysTextBox.Text = $DefaultRecentProfilesDays
+    $RecentProfilesCheckBox.FlatAppearance = [System.Windows.Forms.FlatStyle]::Flat
     $SelectProfileGroupBox.Controls.Add($RecentProfilesDaysTextBox)
 
     # Only recent profiles check box
