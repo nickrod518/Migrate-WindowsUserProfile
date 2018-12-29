@@ -1211,6 +1211,7 @@ process {
     $TabControl.DataBindings.DefaultDataSourceUpdateMode = 0
     $TabControl.Location = New-Object System.Drawing.Size(10, 10)
     $TabControl.Size = New-Object System.Drawing.Size(480, 490)
+
     $Form.Controls.Add($TabControl)
 
     # Log output text box
@@ -1323,7 +1324,6 @@ process {
     $TestConnectionButton_OldPage.Location = New-Object System.Drawing.Size(335, 33)
     $TestConnectionButton_OldPage.Size = New-Object System.Drawing.Size(100, 22)
     $TestConnectionButton_OldPage.Text = 'Test Connection'
-    $TestConnectionButton_OldPage.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $TestConnectionButton_OldPage.Add_Click({
             $TestComputerConnectionParams = @{
                 ComputerNameTextBox = $NewComputerNameTextBox_OldPage
@@ -1340,7 +1340,6 @@ process {
     $ConnectionCheckBox_OldPage.Text = 'Connected'
     $ConnectionCheckBox_OldPage.Location = New-Object System.Drawing.Size(336, 58)
     $ConnectionCheckBox_OldPage.Size = New-Object System.Drawing.Size(100, 20)
-    $ConnectionCheckBox_OldPage.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $OldComputerInfoGroupBox.Controls.Add($ConnectionCheckBox_OldPage)
 
     # Profile selection group box
@@ -1355,7 +1354,6 @@ process {
     $SelectProfileButton.Location = New-Object System.Drawing.Size(30, 20)
     $SelectProfileButton.Size = New-Object System.Drawing.Size(160, 20)
     $SelectProfileButton.Text = 'Select Profile(s) to Migrate'
-    $SelectProfileButton.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $SelectProfileButton.Add_Click({
             Update-Log "Please wait while profiles are found..."
             $Script:SelectedProfile = Get-UserProfiles |
@@ -1370,7 +1368,6 @@ process {
     $RecentProfilesDaysTextBox.Location = New-Object System.Drawing.Size(165, 70)
     $RecentProfilesDaysTextBox.Size = New-Object System.Drawing.Size(40, 20)
     $RecentProfilesDaysTextBox.Text = $DefaultRecentProfilesDays
-    $RecentProfilesCheckBox.FlatAppearance = [System.Windows.Forms.FlatStyle]::Flat
     $SelectProfileGroupBox.Controls.Add($RecentProfilesDaysTextBox)
 
     # Only recent profiles check box
