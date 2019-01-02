@@ -1186,8 +1186,10 @@ public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
     }
 
     # Load assemblies for building forms
-    [System.Reflection.Assembly]::LoadWithPartialName("System.Drawing") | Out-Null
-    [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") | Out-Null
+    # [System.Reflection.Assembly]::LoadWithPartialName("System.Drawing") | Out-Null
+    # [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") | Out-Null
+    Add-Type -AssemblyName System.Windows.Forms
+    Add-Type -AssemblyName System.Drawing
 
     $Script:Destination = ''
 }
@@ -1198,15 +1200,18 @@ process {
     $Form.Text = 'Migration Assistant by Nick Rodriguez'
     $Form.Size = New-Object System.Drawing.Size(1000, 550)
     $Form.SizeGripStyle = 'Hide'
-    $Form.FormBorderStyle = 'FixedToolWindow'
+    $Form.FormBorderStyle = 'FixedSingle'
     $Form.MaximizeBox = $false
     $Form.StartPosition = "CenterScreen"
+    $Icon = [system.drawing.icon]::ExtractAssociatedIcon($PSHOME + "\powershell.exe")
+    $Form.Icon = $Icon
 
     # Create tab controls
     $TabControl = New-object System.Windows.Forms.TabControl
     $TabControl.DataBindings.DefaultDataSourceUpdateMode = 0
     $TabControl.Location = New-Object System.Drawing.Size(10, 10)
     $TabControl.Size = New-Object System.Drawing.Size(480, 490)
+
     $Form.Controls.Add($TabControl)
 
     # Log output text box
