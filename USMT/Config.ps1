@@ -82,6 +82,9 @@ $HidePowershellWindow = $true
 # Define how to handle EFS format files. Options are abort (default behaviour), skip, decryptcopy, copyraw
 $EFSHandling = "abort"
 
+# Optional webhook to be triggered upon migration completion
+$DefaultWebhookEndpoint = 'https://my.webhook.com'
+
 # Users to additionally send every migration result to
 $DefaultEmailEnabled = $false
 $DefaultEmailSender = 'MigrationAlert@company.com'

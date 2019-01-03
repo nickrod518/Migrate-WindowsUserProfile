@@ -487,6 +487,18 @@ $WallpapersXML
             $EmailSubject = "Migration Save Results of $($OldComputerNameTextBox_OldPage.Text) to $($NewComputerNameTextBox_OldPage.Text)"
         }
 
+        if ($WebhookCheckBox.Checked) {
+            Update-Log "Invoking webhook [$($WebhookEndpointTextBox.Text)]..."
+            try {
+                $response = Invoke-WebRequest $WebhookEndpointTextBox.Text
+            }
+            catch {
+                $response = $_.Exception.Message
+            }
+
+            Update-Log $response
+        }
+
         if ($EmailCheckBox.Checked) {
             if ($SMTPConnectionCheckBox.Checked -or (Test-Connection -ComputerName $SMTPServerTextBox.Text -Quiet)) {
                 $SMTPConnectionCheckBox.Checked = $true
@@ -1186,8 +1198,10 @@ public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
     }
 
     # Load assemblies for building forms
-    [System.Reflection.Assembly]::LoadWithPartialName("System.Drawing") | Out-Null
-    [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") | Out-Null
+    # [System.Reflection.Assembly]::LoadWithPartialName("System.Drawing") | Out-Null
+    # [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") | Out-Null
+    Add-Type -AssemblyName System.Windows.Forms
+    Add-Type -AssemblyName System.Drawing
 
     $Script:Destination = ''
 }
@@ -1198,15 +1212,18 @@ process {
     $Form.Text = 'Migration Assistant by Nick Rodriguez'
     $Form.Size = New-Object System.Drawing.Size(1000, 550)
     $Form.SizeGripStyle = 'Hide'
-    $Form.FormBorderStyle = 'FixedToolWindow'
+    $Form.FormBorderStyle = 'FixedSingle'
     $Form.MaximizeBox = $false
     $Form.StartPosition = "CenterScreen"
+    $Icon = [system.drawing.icon]::ExtractAssociatedIcon($PSHOME + "\powershell.exe")
+    $Form.Icon = $Icon
 
     # Create tab controls
     $TabControl = New-object System.Windows.Forms.TabControl
     $TabControl.DataBindings.DefaultDataSourceUpdateMode = 0
     $TabControl.Location = New-Object System.Drawing.Size(10, 10)
     $TabControl.Size = New-Object System.Drawing.Size(480, 490)
+
     $Form.Controls.Add($TabControl)
 
     # Log output text box
@@ -2121,16 +2138,65 @@ process {
     $MigrateButton_NewPage.Add_Click({ Restore-UserState })
     $NewComputerTabPage.Controls.Add($MigrateButton_NewPage)
 
-    # Create email settings tab
+    # Create notification settings tab
     $EmailSettingsTabPage = New-Object System.Windows.Forms.TabPage
     $EmailSettingsTabPage.DataBindings.DefaultDataSourceUpdateMode = 0
     $EmailSettingsTabPage.UseVisualStyleBackColor = $true
-    $EmailSettingsTabPage.Text = 'Email Settings'
+    $EmailSettingsTabPage.Text = 'Notifications'
     $TabControl.Controls.Add($EmailSettingsTabPage)
+
+    # Webhook group box
+    $WebhookGroupBox = New-Object System.Windows.Forms.GroupBox
+    $WebhookGroupBox.Location = New-Object System.Drawing.Size(240, 60)
+    $WebhookGroupBox.Size = New-Object System.Drawing.Size(220, 80)
+    $WebhookGroupBox.Text = 'Webhook [UNTESTED FEATURE]'
+    $EmailSettingsTabPage.Controls.Add($WebhookGroupBox)
+
+    # Webhook endpoint text box
+    $WebhookEndpointTextBox = New-Object System.Windows.Forms.TextBox
+    $WebhookEndpointTextBox.Location = New-Object System.Drawing.Size(5, 20)
+    $WebhookEndpointTextBox.Size = New-Object System.Drawing.Size(210, 25)
+    $WebhookEndpointTextBox.Text = $DefaultWebhookEndpoint
+    $WebhookGroupBox.Controls.Add($WebhookEndpointTextBox)
+
+    # Button to test webhook
+    $WebhookTestButton = New-Object System.Windows.Forms.Button
+    $WebhookTestButton.Location = New-Object System.Drawing.Size(9, 50)
+    $WebhookTestButton.Size = New-Object System.Drawing.Size(100, 22)
+    $WebhookTestButton.Text = 'Test Connection'
+    $WebhookTestButton.Add_Click({
+        Update-Log "Testing webhook [$($WebhookEndpointTextBox.Text)]..."
+        try {
+            $response = Invoke-WebRequest $WebhookEndpointTextBox.Text
+        }
+        catch {
+            $response = $_.Exception.Message
+        }
+
+        Update-Log $response
+    })
+    $WebhookGroupBox.Controls.Add($WebhookTestButton)
+
+    # Webhook enabled check box
+    $WebhookCheckBox = New-Object System.Windows.Forms.CheckBox
+    $WebhookCheckBox.Text = 'Enabled'
+    $WebhookCheckBox.Location = New-Object System.Drawing.Size(135, 50)
+    $WebhookCheckBox.Size = New-Object System.Drawing.Size(80, 20)
+    $WebhookCheckBox.Add_Click({
+        if ($WebhookCheckBox.Checked -eq $true) {
+            Update-Log 'Webhook enabled' -Color 'Yellow' -NoNewLine
+            Update-Log ' - Webhook will be invoked.'
+        }
+        else {
+            Update-Log 'Webhook disabled' -Color 'Yellow' -NoNewLine
+            Update-Log ' - Webhook will not be invoked.'
+        }
+    })
+    $WebhookGroupBox.Controls.Add($WebhookCheckBox)
 
     # Email enabled check box
     $EmailCheckBox = New-Object System.Windows.Forms.CheckBox
-    $EmailCheckBox.Text = 'Enabled'
+    $EmailCheckBox.Text = 'Email Notifications Enabled'
     $EmailCheckBox.Location = New-Object System.Drawing.Size(10, 10)
     $EmailCheckBox.Size = New-Object System.Drawing.Size(300, 30)
     $EmailCheckBox.Checked = $DefaultEmailEnabled
@@ -2183,7 +2249,7 @@ process {
     $SMTPConnectionCheckBox.Enabled = $false
     $SMTPConnectionCheckBox.Text = 'Reachable'
     $SMTPConnectionCheckBox.Location = New-Object System.Drawing.Size(135, 50)
-    $SMTPConnectionCheckBox.Size = New-Object System.Drawing.Size(100, 20)
+    $SMTPConnectionCheckBox.Size = New-Object System.Drawing.Size(80, 20)
     $SMTPServerGroupBox.Controls.Add($SMTPConnectionCheckBox)
 
     # If email is enabled, check if SMTP server is reachable
