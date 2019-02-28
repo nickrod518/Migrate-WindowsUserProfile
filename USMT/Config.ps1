@@ -55,7 +55,7 @@ $DefaultRecentProfilesDays = 90
 $Arch = (Get-WmiObject Win32_OperatingSystem).OSArchitecture
 if ($Arch -match '64') {
     $USMTPath = "$ScriptRoot\USMT\amd64"
-} elseif ($Arch -match '86') {
+} elseif (($Arch -match '86') -or ($Arch -match '32')) {
     $USMTPath = "$ScriptRoot\USMT\x86"
 }
 else {
