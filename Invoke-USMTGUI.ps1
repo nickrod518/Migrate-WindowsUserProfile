@@ -1767,7 +1767,7 @@ process {
     $ExtraDirectoriesDataGridView.RowHeadersVisible = $false
     foreach ($directory in $DefaultExtraDirectories) {
         if (Test-Path $directory) {
-            $ExtraDirectoriesDataGridView.Rows.Add($directory)
+            $ExtraDirectoriesDataGridView.Rows.Add($directory) | Out-Null
         }
         else {
             Update-Log "Extra default directory [$directory] not found. Ensure it exists before running migration." -Color 'Yellow'
@@ -2263,7 +2263,7 @@ process {
     $AddEmailRecipientButton.Font = 'Consolas, 14'
     $AddEmailRecipientButton.Add_Click({
             Update-Log "Adding to email recipients: $($EmailRecipientToAddTextBox.Text)."
-            $EmailRecipientsDataGridView.Rows.Add($EmailRecipientToAddTextBox.Text)
+            $EmailRecipientsDataGridView.Rows.Add($EmailRecipientToAddTextBox.Text) | Out-Null
         })
     $EmailRecipientsDataGridView.Controls.Add($AddEmailRecipientButton)
 
