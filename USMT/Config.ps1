@@ -26,6 +26,9 @@ $ValidIPAddress = '*'
 # Path to store the migration data on the new computer, directory will be created if it doesn't exist
 $MigrationStorePath = 'C:\TEMP\MigrationStore'
 
+# Default save remotely option
+$DefaultSaveRemotely = $true
+
 # Default user profile items to exclude from migration, more info found here:
 # https://technet.microsoft.com/en-us/library/cc722303(v=ws.10).aspx
 $DefaultIncludeAppData = $true
@@ -41,8 +44,14 @@ $DefaultIncludeMyMusic = $true
 $DefaultIncludeMyPictures = $true
 $DefaultIncludeMyVideo = $true
 
-# Default extra directories to include
+# Default extra directories to include (all file types)
 $DefaultExtraDirectories = @()
+
+# Default extra file patterns to include (global)
+$DefaultExtraFiles = @()
+
+# Default extra file patterns to exclude (global)
+$DefaultExcludeFiles = @()
 
 # Default value for SaveStateTaskCompleted on the Restore Tab
 $DefaultSaveStateTaskCompleted = $true
