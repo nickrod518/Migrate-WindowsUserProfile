@@ -1184,6 +1184,8 @@ $WallpapersXML
             $ChangeSaveDestinationButton.Enabled = $false
             $ChangeSaveSourceButton.Enabled = $false
             $AddExtraDirectoryButton.Enabled = $false
+            $SelectProfileButton.Enabled = $false
+            $IncludeCustomXMLButton.Enabled = $false
         }
     }
 
