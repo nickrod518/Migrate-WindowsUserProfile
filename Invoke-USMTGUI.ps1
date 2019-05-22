@@ -238,6 +238,104 @@ begin {
             Update-Log 'No extra directories will be included.'
         }
 
+
+# Add additional file patterns
+        $ExtraFilesCount = $DefaultExtraFiles.Count
+
+        if ($ExtraFilesCount) {
+            Update-Log "Including $ExtraFilesCount extra file patterns."
+
+            $ExtraFilesXML = @"
+    <!-- This component includes the additional file patterns selected by the user -->
+    <component type="Documents" context="System">
+        <displayName>Additional File Patterns</displayName>
+        <role role="Data">
+            <rules>
+                <include>
+                    <objectSet>
+
+"@
+            # Include each file pattern user has added to the Default Extra Files
+            $DefaultExtraFiles | ForEach-Object {
+                $ExtraFile = $_
+
+                $ExtraFilesXML += @"
+                        <script>MigXmlHelper.GenerateDrivePatterns ("* [$ExtraFile]", "Fixed")</script>
+
+"@
+            }
+
+            $ExtraFilesXML += @"
+                    </objectSet>
+                </include>
+                <exclude>
+                    <objectSet>
+
+"@
+            # Exclude each file pattern user has added to the Default Extra Files from Users
+            $DefaultExtraFiles | ForEach-Object {
+                $ExtraFile = $_
+
+                $ExtraFilesXML += @"
+                        <pattern type=`"File`"> C:\Users\* [$ExtraFile]</pattern>
+
+"@
+            }
+
+            $ExtraFilesXML += @"
+                    </objectSet>
+                </exclude>
+            </rules>
+        </role>
+    </component>
+"@
+        }
+        else {
+            Update-Log 'No extra file patterns will be included.'
+        }
+# End add additional file patterns
+
+# Exclude file patterns
+$ExcludeFilesCount = $DefaultExcludeFiles.Count
+
+if ($ExcludeFilesCount) {
+    Update-Log "Excluding $ExcludeFilesCount extra file patterns."
+    
+    # System Context
+    $ExcludeFilesXML = @"
+    <!-- This component excludes the additional file patterns selected by the user -->
+    <component type="Documents" context="UserandSystem">
+        <displayName>Additional Excluded File Patterns</displayName>
+        <role role="Data">
+            <rules>
+                <unconditionalExclude>
+                    <objectSet>
+
+"@
+    # Exclude each file pattern user has added to the Default Exclude Files
+    $DefaultExcludeFiles | ForEach-Object {
+        $ExcludeFile = $_
+
+        $ExcludeFilesXML += @"
+                        <script>MigXmlHelper.GenerateDrivePatterns ("* [$ExcludeFile]", "Fixed")</script>
+
+"@
+    }
+
+    $ExcludeFilesXML += @"
+                    </objectSet>
+                </unconditionalExclude>
+            </rules>
+        </role>
+    </component>
+"@
+}
+else {
+    Update-Log 'No additional file patterns will be excluded.'
+}
+
+# End exclude file patterns
+
         Update-Log 'Data to be included:'
         foreach ($Control in $InclusionsGroupBox.Controls) { if ($Control.Checked) { Update-Log $Control.Text } }
 
@@ -384,6 +482,8 @@ begin {
     </_locDefinition>
 
 $ExtraDirectoryXML
+$ExtraFilesXML
+$ExcludeFilesXML
 
     <!-- This component migrates all user data except specified exclusions -->
     <component type="Documents" context="User">
@@ -1084,6 +1184,8 @@ $WallpapersXML
             $ChangeSaveDestinationButton.Enabled = $false
             $ChangeSaveSourceButton.Enabled = $false
             $AddExtraDirectoryButton.Enabled = $false
+            $SelectProfileButton.Enabled = $false
+            $IncludeCustomXMLButton.Enabled = $false
         }
     }
 
@@ -1186,8 +1288,10 @@ public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
     }
 
     # Load assemblies for building forms
-    [System.Reflection.Assembly]::LoadWithPartialName("System.Drawing") | Out-Null
-    [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") | Out-Null
+    # [System.Reflection.Assembly]::LoadWithPartialName("System.Drawing") | Out-Null
+    # [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") | Out-Null
+    Add-Type -AssemblyName System.Windows.Forms
+    Add-Type -AssemblyName System.Drawing
 
     $Script:Destination = ''
 }
@@ -1198,15 +1302,18 @@ process {
     $Form.Text = 'Migration Assistant by Nick Rodriguez'
     $Form.Size = New-Object System.Drawing.Size(1000, 550)
     $Form.SizeGripStyle = 'Hide'
-    $Form.FormBorderStyle = 'FixedToolWindow'
+    $Form.FormBorderStyle = 'FixedSingle'
     $Form.MaximizeBox = $false
     $Form.StartPosition = "CenterScreen"
+    $Icon = [system.drawing.icon]::ExtractAssociatedIcon($PSHOME + "\powershell.exe")
+    $Form.Icon = $Icon
 
     # Create tab controls
     $TabControl = New-object System.Windows.Forms.TabControl
     $TabControl.DataBindings.DefaultDataSourceUpdateMode = 0
     $TabControl.Location = New-Object System.Drawing.Size(10, 10)
     $TabControl.Size = New-Object System.Drawing.Size(480, 490)
+
     $Form.Controls.Add($TabControl)
 
     # Log output text box
@@ -1400,9 +1507,16 @@ process {
     # Alternative save check box
     $SaveRemotelyCheckBox = New-Object System.Windows.Forms.CheckBox
     $SaveRemotelyCheckBox.Text = 'Save on new computer'
-    $SaveRemotelyCheckBox.Checked = $true
+    $SaveRemotelyCheckBox.Checked = $DefaultSaveRemotely
     $SaveRemotelyCheckBox.Location = New-Object System.Drawing.Size(45, 45)
     $SaveRemotelyCheckBox.Size = New-Object System.Drawing.Size(150, 20)
+    if ($SaveRemotelyCheckBox.Checked -eq $true) {
+        $OldComputerInfoGroupBox.Enabled = $true
+    }
+    else {
+        $OldComputerInfoGroupBox.Enabled = $false
+    }
+    # Toggle when checkbox clicked
     $SaveRemotelyCheckBox.Add_Click({
             if ($SaveRemotelyCheckBox.Checked -eq $true) {
                 $OldComputerInfoGroupBox.Enabled = $true
@@ -1762,7 +1876,7 @@ process {
     $ExtraDirectoriesDataGridView.RowHeadersVisible = $false
     foreach ($directory in $DefaultExtraDirectories) {
         if (Test-Path $directory) {
-            $ExtraDirectoriesDataGridView.Rows.Add($directory)
+            $ExtraDirectoriesDataGridView.Rows.Add($directory) | Out-Null
         }
         else {
             Update-Log "Extra default directory [$directory] not found. Ensure it exists before running migration." -Color 'Yellow'
@@ -2258,7 +2372,7 @@ process {
     $AddEmailRecipientButton.Font = 'Consolas, 14'
     $AddEmailRecipientButton.Add_Click({
             Update-Log "Adding to email recipients: $($EmailRecipientToAddTextBox.Text)."
-            $EmailRecipientsDataGridView.Rows.Add($EmailRecipientToAddTextBox.Text)
+            $EmailRecipientsDataGridView.Rows.Add($EmailRecipientToAddTextBox.Text) | Out-Null
         })
     $EmailRecipientsDataGridView.Controls.Add($AddEmailRecipientButton)
 
