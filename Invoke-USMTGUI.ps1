@@ -13,7 +13,7 @@ USMT environmental variables: https://technet.microsoft.com/en-us/library/cc7491
 
 begin {
     # Define the script version
-    $ScriptVersion = "3.4.4"
+    $ScriptVersion = "3.5.4"
 
     # Set ScripRoot variable to the path which the script is executed from
     $ScriptRoot = if ($PSVersionTable.PSVersion.Major -lt 3) {
@@ -179,7 +179,7 @@ begin {
         try {
             # If user hits cancel don't add the path
             if ($Result -eq 'OK') {
-                Update-Log "Adding to extra directories: $SelectedDirectory."
+                Update-Log "Adding to extra directories: [$SelectedDirectory]."
                 $ExtraDirectoriesDataGridView.Rows.Add($SelectedDirectory)
             }
             else {
@@ -193,10 +193,10 @@ begin {
 
     function Remove-ExtraDirectory {
         # Remove selected cell from Extra Directories data grid view
-        $CurrentCell = $ExtraDirectoriesDataGridView.CurrentCell
-        Update-Log "Removed [$($CurrentCell.Value)] from extra directories."
-        $CurrentRow = $ExtraDirectoriesDataGridView.Rows[$CurrentCell.RowIndex]
-        $ExtraDirectoriesDataGridView.Rows.Remove($CurrentRow)
+        foreach ($CurrentRow in $ExtraDirectoriesDataGridView.SelectedRows) {
+            Update-Log "Removed [$($CurrentRow.Cells.Value)] from extra directories."
+            $ExtraDirectoriesDataGridView.Rows.Remove($CurrentRow)
+        }
     }
 
     function Set-Config {
@@ -797,7 +797,7 @@ $WallpapersXML
 
 
                 # Create config syntax for scanstate for custom XMLs.
-                IF ($SelectedXMLS) {
+                if ($SelectedXMLS) {
                     #Create the scanstate syntax line for the config files.
                     foreach ($ConfigXML in $SelectedXMLS) {
                         $ConfigXMLPath = """$Script:USMTPath\$ConfigXML"""
@@ -806,7 +806,7 @@ $WallpapersXML
                 }
 
                 # Create config syntax for scanstate for generated XML.
-                IF (!($SelectedXMLS)) {
+                if (!($SelectedXMLS)) {
                     # Create the scan configuration
                     Update-Log 'Generating configuration file...'
                     $Config = Set-Config
@@ -1824,8 +1824,8 @@ process {
             # Create a Description property
             $Script:DiscoveredXMLS | Add-Member -NotePropertyName Description -NotePropertyValue "No Description Available"
             foreach ($XMLFile in $Script:DiscoveredXMLS) {
-                $XMLDescriptionFile = $XmlFIle -Replace ".xml", ".txt"
-                if (Test-path $XMLDescriptionFIle) {
+                $XMLDescriptionFile = $XmlFile -Replace ".xml", ".txt"
+                if (Test-path $XMLDescriptionFile) {
                     $XMLDescription = get-content $XMLDescriptionFile
                     $XmlFile.Description = $XMLDescription
                 }
@@ -1869,7 +1869,8 @@ process {
     $ExtraDirectoriesDataGridView.AllowUserToAddRows = $false
     $ExtraDirectoriesDataGridView.AllowUserToResizeRows = $false
     $ExtraDirectoriesDataGridView.AllowUserToResizeColumns = $false
-    $ExtraDirectoriesDataGridView.MultiSelect = $false
+    $ExtraDirectoriesDataGridView.MultiSelect = $true
+    $ExtraDirectoriesDataGridView.SelectionMode = 'FullRowSelect'
     $ExtraDirectoriesDataGridView.ColumnCount = 1
     $ExtraDirectoriesDataGridView.AutoSizeColumnsMode = 'Fill'
     $ExtraDirectoriesDataGridView.ColumnHeadersVisible = $false
@@ -2335,11 +2336,12 @@ process {
     $EmailRecipientsDataGridView = New-Object System.Windows.Forms.DataGridView
     $EmailRecipientsDataGridView.Location = New-Object System.Drawing.Size(5, 20)
     $EmailRecipientsDataGridView.Size = New-Object System.Drawing.Size(210, 170)
-    $EmailRecipientsDataGridView.ReadOnly = $true
+    $EmailRecipientsDataGridView.ReadOnly = $false
     $EmailRecipientsDataGridView.AllowUserToAddRows = $false
     $EmailRecipientsDataGridView.AllowUserToResizeRows = $false
     $EmailRecipientsDataGridView.AllowUserToResizeColumns = $false
-    $EmailRecipientsDataGridView.MultiSelect = $false
+    $EmailRecipientsDataGridView.MultiSelect = $true
+    $EmailRecipientsDataGridView.SelectionMode = 'FullRowSelect'
     $EmailRecipientsDataGridView.ColumnCount = 1
     $EmailRecipientsDataGridView.AutoSizeColumnsMode = 'Fill'
     $EmailRecipientsDataGridView.ColumnHeadersVisible = $false
@@ -2357,10 +2359,10 @@ process {
     $RemoveEmailRecipientButton.Font = 'Consolas, 14'
     $RemoveEmailRecipientButton.Add_Click({
             # Remove selected cell from Email Recipients data grid view
-            $CurrentCell = $EmailRecipientsDataGridView.CurrentCell
-            Update-Log "Removed [$($CurrentCell.Value)] from email recipients."
-            $CurrentRow = $EmailRecipientsDataGridView.Rows[$CurrentCell.RowIndex]
-            $EmailRecipientsDataGridView.Rows.Remove($CurrentRow)
+            foreach ($CurrentRow in $EmailRecipientsDataGridView.SelectedRows) {
+                Update-Log "Removed [$($CurrentRow.Cells.Value)] from email recipients."
+                $EmailRecipientsDataGridView.Rows.Remove($CurrentRow)
+            }
         })
     $EmailRecipientsDataGridView.Controls.Add($RemoveEmailRecipientButton)
 
@@ -2371,7 +2373,7 @@ process {
     $AddEmailRecipientButton.Text = '+'
     $AddEmailRecipientButton.Font = 'Consolas, 14'
     $AddEmailRecipientButton.Add_Click({
-            Update-Log "Adding to email recipients: $($EmailRecipientToAddTextBox.Text)."
+            Update-Log "Adding to email recipients: [$($EmailRecipientToAddTextBox.Text)]."
             $EmailRecipientsDataGridView.Rows.Add($EmailRecipientToAddTextBox.Text) | Out-Null
         })
     $EmailRecipientsDataGridView.Controls.Add($AddEmailRecipientButton)
@@ -2414,7 +2416,8 @@ process {
     $OldComputerScriptsDataGridView.AllowUserToAddRows = $false
     $OldComputerScriptsDataGridView.AllowUserToResizeRows = $false
     $OldComputerScriptsDataGridView.AllowUserToResizeColumns = $false
-    $OldComputerScriptsDataGridView.MultiSelect = $false
+    $OldComputerScriptsDataGridView.MultiSelect = $true
+    $OldComputerScriptsDataGridView.SelectionMode = 'FullRowSelect'
     $OldComputerScriptsDataGridView.ColumnCount = 1
     $OldComputerScriptsDataGridView.AutoSizeColumnsMode = 'Fill'
     $OldComputerScriptsDataGridView.ColumnHeadersVisible = $false
@@ -2437,11 +2440,11 @@ process {
     $RemoveOldComputerScriptButton.Text = '-'
     $RemoveOldComputerScriptButton.Font = 'Consolas, 14'
     $RemoveOldComputerScriptButton.Add_Click({
-            # Remove selected cell from new computer scripts data grid view
-            $CurrentCell = $NewComputerScriptsDataGridView.CurrentCell
-            Update-Log "Removed [$($CurrentCell.Value)] from old computer scripts."
-            $CurrentRow = $NewComputerScriptsDataGridView.Rows[$CurrentCell.RowIndex]
-            $NewComputerScriptsDataGridView.Rows.Remove($CurrentRow)
+            # Remove selected cell from old computer scripts data grid view
+            foreach ($CurrentRow in $OldComputerScriptsDataGridView.SelectedRows) {
+                Update-Log "Removed [$($CurrentRow.Cells.Value)] from old computer scripts."
+                $OldComputerScriptsDataGridView.Rows.Remove($CurrentRow)
+            }
         })
     $OldComputerScriptsDataGridView.Controls.Add($RemoveOldComputerScriptButton)
 
@@ -2460,7 +2463,8 @@ process {
     $NewComputerScriptsDataGridView.AllowUserToAddRows = $false
     $NewComputerScriptsDataGridView.AllowUserToResizeRows = $false
     $NewComputerScriptsDataGridView.AllowUserToResizeColumns = $false
-    $NewComputerScriptsDataGridView.MultiSelect = $false
+    $NewComputerScriptsDataGridView.MultiSelect = $true
+    $NewComputerScriptsDataGridView.SelectionMode = 'FullRowSelect'
     $NewComputerScriptsDataGridView.ColumnCount = 1
     $NewComputerScriptsDataGridView.AutoSizeColumnsMode = 'Fill'
     $NewComputerScriptsDataGridView.ColumnHeadersVisible = $false
@@ -2484,10 +2488,10 @@ process {
     $RemoveNewComputerScriptButton.Font = 'Consolas, 14'
     $RemoveNewComputerScriptButton.Add_Click({
             # Remove selected cell from new computer scripts data grid view
-            $CurrentCell = $NewComputerScriptsDataGridView.CurrentCell
-            Update-Log "Removed [$($CurrentCell.Value)] from new computer scripts."
-            $CurrentRow = $NewComputerScriptsDataGridView.Rows[$CurrentCell.RowIndex]
-            $NewComputerScriptsDataGridView.Rows.Remove($CurrentRow)
+            foreach ($CurrentRow in $NewComputerScriptsDataGridView.SelectedRows) {
+                Update-Log "Removed [$($CurrentRow.Cells.Value)] from new computer scripts."
+                $NewComputerScriptsDataGridView.Rows.Remove($CurrentRow)
+            }
         })
     $NewComputerScriptsDataGridView.Controls.Add($RemoveNewComputerScriptButton)
 
