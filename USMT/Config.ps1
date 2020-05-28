@@ -44,13 +44,32 @@ $DefaultIncludeMyMusic = $true
 $DefaultIncludeMyPictures = $true
 $DefaultIncludeMyVideo = $true
 
-# Default extra directories to include (all file types)
+<# Default extra directories to include (all file types)
+Example:
+
+This will include the listed paths with all files inside C:\Folder1 
+and C:\Folder2\SubFolder recursively.
+
+$DefaultExtraDirectories = @("C:\Folder1", "C:\Folder2\SubFolder")
+#>
 $DefaultExtraDirectories = @()
 
-# Default extra file patterns to include (global)
+<# Default extra file patterns to include (global)
+Example:
+
+This will include all PST files, anything that starts with Sample 
+and any files named Outlook.txt
+
+$DefaultExcludeFiles = @("*.pst", "Sample*", "Outlook.txt") #>
 $DefaultExtraFiles = @()
 
-# Default extra file patterns to exclude (global)
+<# Default extra file patterns to exclude (global)
+Example:
+
+This will exclude all PST files, anything that starts with Sample 
+and any files named Outlook.txt
+
+$DefaultExcludeFiles = @("*.pst", "Sample*", "Outlook.txt") #>
 $DefaultExcludeFiles = @()
 
 # Default value for SaveStateTaskCompleted on the Restore Tab
