@@ -60,7 +60,7 @@ Example:
 This will include all PST files, anything that starts with Sample 
 and any files named Outlook.txt
 
-$DefaultExcludeFiles = @("*.pst", "Sample*", "Outlook.txt") #>
+$DefaultExtraFiles = @("*.pst", "Sample*", "Outlook.txt") #>
 $DefaultExtraFiles = @()
 
 <# Default extra file patterns to exclude (global)
