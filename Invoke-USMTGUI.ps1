@@ -973,7 +973,7 @@ $WallpapersXML
             $Uncompressed = ''
             # Set the syntax for the encryption
             $DecryptionKey = """$Script:EncryptionPassword"""
-            $DecryptionSnytax = "/decrypt /key:$DecryptionKey"
+            $DecryptionSyntax = "/decrypt /key:$DecryptionKey"
         }
 
         # Set the value to continue on error if it was specified above
@@ -1025,10 +1025,10 @@ $WallpapersXML
             }
 
             Update-Log "$OldUser will be migrated as $NewUser."
-            $Arguments = "`"$Destination`" $LoadStateConfig $LocalAccountOptions `"/mu:$($OldUser):$NewUser`" $DecryptionSnytax $Uncompressed $Logs $ContinueCommand /v:$Script:VerboseLevel"
+            $Arguments = "`"$Destination`" $LoadStateConfig $LocalAccountOptions `"/mu:$($OldUser):$NewUser`" $DecryptionSyntax $Uncompressed $Logs $ContinueCommand /v:$Script:VerboseLevel"
         }
         else {
-            $Arguments = "`"$Destination`" $LoadStateConfig $LocalAccountOptions $DecryptionSnytax $Uncompressed $Logs $ContinueCommand /v:$Script:VerboseLevel"
+            $Arguments = "`"$Destination`" $LoadStateConfig $LocalAccountOptions $DecryptionSyntax $Uncompressed $Logs $ContinueCommand /v:$Script:VerboseLevel"
         }
 
         # Begin loading user state to this computer
