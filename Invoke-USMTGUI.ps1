@@ -129,7 +129,7 @@ begin {
 
         if (-not $UserIdentity.IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator')) {
             Update-Log "You are not running this script as Administrator. " -Color 'Yellow' -NoNewLine
-            Update-Log "Some tasks may fail if launched as Administrator.`n" -Color 'Yellow'
+            Update-Log "Some tasks may fail if not launched as Administrator.`n" -Color 'Yellow'
         }
     }
 
